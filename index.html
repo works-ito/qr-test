@@ -89,7 +89,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbyx4OYpiyIgKOxLqBFkJIiT
 let stream = null;
 let scanning = false;
 let scannedSet = new Set();
-  
+let lastScanned = "";
 let lastScanTime = 0;
 const SCAN_INTERVAL = 80;
   

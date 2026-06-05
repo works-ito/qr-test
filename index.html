@@ -303,6 +303,11 @@ function sendToSheet(qrText) {
   log("読取成功");
 }
 
+document.getElementById("mode").addEventListener("change", saveSelections);
+document.getElementById("location").addEventListener("change", saveSelections);
+document.getElementById("user").addEventListener("change", saveSelections);
+document.getElementById("recTarget").addEventListener("change", saveSelections);
+
 loadSelections();
 toggleRecTarget();
 </script>

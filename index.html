@@ -21,10 +21,6 @@ button, select, input {
 <body>
 <h2>QR連続読取</h2>
 
-  <div id="count" style="font-size:24px; font-weight:bold; margin:10px 0;">
-  読取件数：0件
-</div>
-
   <select id="mode" onchange="toggleRecTarget()">
   <option value="出庫">出庫</option>
   <option value="返却">返却</option>
@@ -59,7 +55,12 @@ button, select, input {
 
 <div id="status">未クリック</div>
 <div id="reader"></div>
-<div id="result"></div>
+<div id="count" style="font-size:24px; font-weight:bold; margin:10px 0;">
+  読取件数：0件
+</div>
+
+<div id="scanList"></div>
+  <div id="result"></div>
 
 <script>
 const GAS_URL = "https://script.google.com/macros/s/AKfycbyx4OYpiyIgKOxLqBFkJIiTaJ0wSF6Hrp12Krkd7MNL996uySBdA6o-d2F4dkT95Be1Vw/exec";
@@ -118,7 +119,8 @@ scannedSet.add(decodedText);
 
 document.getElementById("count").innerText =
   "読取件数：" + scannedSet.size + "件";
-
+document.getElementById("scanList").innerHTML +=
+  "<div>" + decodedText + "</div>";
 document.getElementById("result").innerText += decodedText + "\n";
 sendToSheet(decodedText);
     },

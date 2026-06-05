@@ -164,6 +164,11 @@ function sendToSheet(qrText) {
   });
 
   playBeep("success");
+
+  if (navigator.vibrate) {
+  navigator.vibrate(100);
+}
+  
   log("送信しました\n" + qrText);
 }
 

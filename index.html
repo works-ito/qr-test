@@ -159,9 +159,9 @@ function startQr() {
         "読取件数：" + scannedSet.size + "件";
 
       document.getElementById("scanList").innerHTML =
-        Array.from(scannedSet).map(function(item) {
-          return '<div class="readItem">' + item + '</div>';
-        }).join("");
+  Array.from(scannedSet).reverse().map(function(item) {
+    return '<div class="readItem">' + item + '</div>';
+  }).join("");
 
       sendToSheet(decodedText);
     },

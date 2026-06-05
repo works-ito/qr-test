@@ -82,7 +82,16 @@ button, select, input {
   <option value="メインファクトリー">メインファクトリー</option>
 </select>
 
-<input id="user" placeholder="担当者名">
+<select id="user">
+  <option value="" selected>担当者選択</option>
+  <option value="奥">奥</option>
+  <option value="滝島">滝島</option>
+  <option value="上野">上野</option>
+  <option value="見﨑">見﨑</option>
+  <option value="田之岡">田之岡</option>
+  <option value="篠塚">篠塚</option>
+  <option value="その他">その他</option>
+</select>
 
 <button id="startBtn" onclick="startQr()">カメラ起動</button>
 <button id="stopBtn" onclick="stopQr()" style="display:none;">停止</button>

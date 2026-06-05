@@ -135,8 +135,8 @@ async function startQr() {
     stream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: { ideal: "environment" },
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
       },
       audio: false
     });
@@ -176,7 +176,7 @@ function scanLoop() {
 
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: "dontInvert"
+      inversionAttempts: "attemptBoth"
     });
 
     if (code && code.data) {

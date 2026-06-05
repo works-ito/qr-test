@@ -6,50 +6,154 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 
-<title>QRテスト</title>
+<title>QR連続読取</title>
+
+<style>
+body {
+  font-family: sans-serif;
+  font-size: 22px;
+  padding: 20px;
+}
+
+button, select {
+  font-size: 24px;
+  padding: 14px;
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+#reader {
+  width: 100%;
+  max-width: 420px;
+  margin-top: 15px;
+}
+
+#status {
+  color: blue;
+  font-weight: bold;
+  white-space: pre-wrap;
+  margin-top: 10px;
+}
+
+#result {
+  color: green;
+  white-space: pre-wrap;
+  margin-top: 10px;
+}
+</style>
 </head>
 
 <body>
 
-<h2>QRカメラテスト</h2>
+<h2>QR連続読取</h2>
+
+<select id="mode">
+  <option value="出庫">出庫</option>
+  <option value="返却">返却</option>
+  <option value="修理">修理</option>
+  <option value="完成">完成</option>
+  <option value="拠点移動">拠点移動</option>
+</select>
+
+<select id="location">
+  <option value="本社">本社</option>
+  <option value="三郷">三郷</option>
+  <option value="メインファクトリー">メインファクトリー</option>
+</select>
+
+<input id="user" placeholder="担当者名" style="font-size:24px; padding:14px; width:100%; margin-bottom:12px; box-sizing:border-box;">
 
 <button onclick="startQr()">カメラ起動</button>
+<button onclick="stopQr()">停止</button>
 
 <div id="status">未クリック</div>
-
-<div id="reader" style="width:350px;"></div>
+<div id="reader"></div>
+<div id="result"></div>
 
 <script>
+const GAS_URL = "https://script.google.com/macros/s/AKfycbyx4OYpiyIgKOxLqBFkJIiTaJ0wSF6Hrp12Krkd7MNL996uySBdA6o-d2F4dkT95Be1Vw/exec";
 
-function log(msg){
- document.getElementById("status").innerHTML = msg;
+let qr = null;
+let scannedSet = new Set();
+
+function log(msg) {
+  document.getElementById("status").innerText = msg;
 }
 
-function startQr(){
+function startQr() {
+  log("カメラ起動中...");
 
- log("カメラ要求中...");
+  if (qr) {
+    log("すでに起動中");
+    return;
+  }
 
- const qr = new Html5Qrcode("reader");
+  qr = new Html5Qrcode("reader");
 
- qr.start(
-   { facingMode: "environment" },
-   {
-     fps: 10,
-     qrbox: 250
-   },
-   function(decodedText){
-     log("読取成功<br>" + decodedText);
-   },
-   function(errorMessage){}
- )
- .then(()=>{
-   log("カメラ起動成功");
- })
- .catch((err)=>{
-   log("失敗<br>" + err);
- });
+  qr.start(
+    { facingMode: "environment" },
+    {
+      fps: 10,
+      qrbox: { width: 250, height: 250 }
+    },
+    function(decodedText) {
+      if (scannedSet.has(decodedText)) {
+        return;
+      }
+
+      scannedSet.add(decodedText);
+
+      document.getElementById("result").innerText += decodedText + "\n";
+      sendToSheet(decodedText);
+    },
+    function(errorMessage) {}
+  )
+  .then(function() {
+    log("カメラ起動成功");
+  })
+  .catch(function(err) {
+    log("カメラ起動失敗\n" + err);
+    alert("カメラ起動失敗\n" + err);
+    qr = null;
+  });
 }
 
+function stopQr() {
+  if (!qr) {
+    log("まだ起動していません");
+    return;
+  }
+
+  qr.stop()
+    .then(function() {
+      qr.clear();
+      qr = null;
+      log("停止しました");
+    })
+    .catch(function(err) {
+      log("停止失敗\n" + err);
+    });
+}
+
+function sendToSheet(qrText) {
+  const data = {
+    mode: document.getElementById("mode").value,
+    qr: qrText,
+    user: document.getElementById("user").value,
+    location: document.getElementById("location").value
+  };
+
+  fetch(GAS_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: {
+      "Content-Type": "text/plain"
+    },
+    body: JSON.stringify(data)
+  });
+
+  log("送信しました\n" + qrText);
+}
 </script>
 
 </body>

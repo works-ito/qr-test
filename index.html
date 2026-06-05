@@ -96,6 +96,34 @@ const SCAN_INTERVAL = 80;
 function log(msg) {
   document.getElementById("status").innerText = msg;
 }
+function saveSelections() {
+  localStorage.setItem("mode", document.getElementById("mode").value);
+  localStorage.setItem("location", document.getElementById("location").value);
+  localStorage.setItem("user", document.getElementById("user").value);
+  localStorage.setItem("recTarget", document.getElementById("recTarget").value);
+}
+
+function loadSelections() {
+  if (localStorage.getItem("mode")) {
+    document.getElementById("mode").value = localStorage.getItem("mode");
+  }
+  if (localStorage.getItem("location")) {
+    document.getElementById("location").value = localStorage.getItem("location");
+  }
+  if (localStorage.getItem("user")) {
+    document.getElementById("user").value = localStorage.getItem("user");
+  }
+  if (localStorage.getItem("recTarget")) {
+    document.getElementById("recTarget").value = localStorage.getItem("recTarget");
+  }
+}
+
+document.getElementById("mode").addEventListener("change", saveSelections);
+document.getElementById("location").addEventListener("change", saveSelections);
+document.getElementById("user").addEventListener("change", saveSelections);
+document.getElementById("recTarget").addEventListener("change", saveSelections);
+
+loadSelections();
 
 function toggleRecTarget() {
   const mode = document.getElementById("mode").value;

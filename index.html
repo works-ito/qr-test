@@ -228,6 +228,8 @@ function handleDecoded(decodedText) {
   if (scannedSet.has(decodedText)) return;
 
   scannedSet.add(decodedText);
+lastScanned = decodedText;
+document.getElementById("undoBtn").style.display = "block";
 
   document.getElementById("lastRead").innerText =
     "読取成功\n✔ " + decodedText;

@@ -280,7 +280,36 @@ function resetScan() {
 
   log("読取履歴をリセットしました");
 }
+function undoLastScan() {
+  if (!lastScanned) {
+    log("取消できる読取がありません");
+    return;
+  }
 
+  scannedSet.delete(lastScanned);
+
+  document.getElementById("count").innerText =
+    "読取件数：" + scannedSet.size + "件";
+
+  document.getElementById("scanList").innerHTML =
+    Array.from(scannedSet).reverse().map(function(item) {
+      return '<div class="readItem">' + item + '</div>';
+    }).join("");
+
+  document.getElementById("lastRead").innerText =
+    "取消しました\n✖ " + lastScanned;
+
+  log("取消しました");
+
+  // GASはまだ未実装。あとでここから取消ログ送信する
+  // sendUndoToSheet(lastScanned);
+
+  lastScanned = "";
+
+  if (scannedSet.size === 0) {
+    document.getElementById("undoBtn").style.display = "none";
+  }
+}
 function sendToSheet(qrText) {
   const data = {
     mode: document.getElementById("mode").value,

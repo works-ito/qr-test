@@ -89,7 +89,10 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbyx4OYpiyIgKOxLqBFkJIiT
 let stream = null;
 let scanning = false;
 let scannedSet = new Set();
-
+  
+let lastScanTime = 0;
+const SCAN_INTERVAL = 80;
+  
 function log(msg) {
   document.getElementById("status").innerText = msg;
 }
@@ -164,6 +167,12 @@ async function startQr() {
 function scanLoop() {
   if (!scanning) return;
 
+  requestAnimationFrame(scanLoop);
+
+  const now = Date.now();
+  if (now - lastScanTime < SCAN_INTERVAL) return;
+  lastScanTime = now;
+
   const video = document.getElementById("video");
   const canvas = document.getElementById("canvas");
   const ctx = canvas.getContext("2d");
@@ -176,13 +185,14 @@ function scanLoop() {
 
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: "attemptBoth"
+      inversionAttempts: "dontInvert"
     });
 
     if (code && code.data) {
       handleDecoded(code.data);
     }
   }
+}
 
   requestAnimationFrame(scanLoop);
 }

@@ -3,61 +3,30 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <title>QR連続読取</title>
 
 <style>
-body {
-  font-family: sans-serif;
-  font-size: 22px;
-  padding: 20px;
-}
-
+body { font-family:sans-serif; font-size:22px; padding:20px; }
 button, select, input {
-  font-size: 24px;
-  padding: 14px;
-  width: 100%;
-  margin-bottom: 12px;
-  box-sizing: border-box;
+  font-size:24px; padding:14px; width:100%;
+  margin-bottom:12px; box-sizing:border-box;
 }
-
-#reader {
-  width: 100%;
-  max-width: 420px;
-  margin-top: 15px;
+#status { color:blue; font-weight:bold; white-space:pre-wrap; margin:10px 0; }
+#lastRead {
+  color:green; font-size:34px; font-weight:bold;
+  margin:10px 0; min-height:80px; white-space:pre-line;
 }
-
-#status {
-  color: blue;
-  font-weight: bold;
-  white-space: pre-wrap;
-  margin: 10px 0;
+#video {
+  width:100%;
+  max-width:420px;
+  margin-top:15px;
+  background:#000;
 }
-
-  #lastRead {
-  color: green;
-  font-size: 34px;
-  font-weight: bold;
-  margin: 10px 0;
-  min-height: 45px;
-}
-  
-#count {
-  font-size: 28px;
-  font-weight: bold;
-  margin: 14px 0 8px;
-}
-
-#scanList {
-  font-size: 28px;
-  line-height: 1.5;
-  margin-top: 8px;
-  white-space: pre-wrap;
-}
-
-.readItem {
-  margin-bottom: 4px;
-}
+#count { font-size:28px; font-weight:bold; margin:14px 0 8px; }
+#scanList { font-size:28px; line-height:1.5; margin-top:8px; white-space:pre-wrap; }
+.readItem { margin-bottom:4px; }
+canvas { display:none; }
 </style>
 </head>
 
@@ -107,8 +76,9 @@ button, select, input {
 
 <div id="status">未クリック</div>
 <div id="lastRead"></div>
-  
-<div id="reader"></div>
+
+<video id="video" playsinline></video>
+<canvas id="canvas"></canvas>
 
 <div id="count">読取件数：0件</div>
 <div id="scanList"></div>
@@ -116,7 +86,8 @@ button, select, input {
 <script>
 const GAS_URL = "https://script.google.com/macros/s/AKfycbyx4OYpiyIgKOxLqBFkJIiTaJ0wSF6Hrp12Krkd7MNL996uySBdA6o-d2F4dkT95Be1Vw/exec";
 
-let qr = null;
+let stream = null;
+let scanning = false;
 let scannedSet = new Set();
 
 function log(msg) {
@@ -126,7 +97,6 @@ function log(msg) {
 function toggleRecTarget() {
   const mode = document.getElementById("mode").value;
   const recModes = ["校正中", "校正完了", "交換完了"];
-
   document.getElementById("recTargetBox").style.display =
     recModes.includes(mode) ? "block" : "none";
 }
@@ -135,14 +105,13 @@ function playBeep(type) {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     const ctx = new AudioContext();
-
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
 
     osc.connect(gain);
     gain.connect(ctx.destination);
 
-    osc.frequency.value = (type === "success") ? 1600 : 220;
+    osc.frequency.value = type === "success" ? 1600 : 220;
     gain.gain.value = 0.8;
 
     osc.start();
@@ -152,69 +121,115 @@ function playBeep(type) {
   }
 }
 
-function startQr() {
+async function startQr() {
   log("カメラ起動中...");
 
-  if (qr) {
+  if (scanning) {
     log("すでに起動中");
     return;
   }
 
-  qr = new Html5Qrcode("reader");
+  try {
+    const video = document.getElementById("video");
 
-  qr.start(
-    { facingMode: "environment" },
-    { fps: 15 },
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      },
+      audio: false
+    });
 
-    function(decodedText) {
-      if (scannedSet.has(decodedText)) {
-        return;
-      }
+    video.srcObject = stream;
+    video.setAttribute("playsinline", true);
+    await video.play();
 
-      scannedSet.add(decodedText);
-document.getElementById("lastRead").innerText = "✔ " + decodedText;
-      
-      document.getElementById("count").innerText =
-        "読取件数：" + scannedSet.size + "件";
+    scanning = true;
 
-      document.getElementById("scanList").innerHTML =
-  Array.from(scannedSet).reverse().map(function(item) {
-    return '<div class="readItem">' + item + '</div>';
-  }).join("");
+    document.getElementById("startBtn").style.display = "none";
+    document.getElementById("stopBtn").style.display = "block";
+    document.getElementById("resetBtn").style.display = "block";
 
-      sendToSheet(decodedText);
-    },
+    log("カメラ起動成功");
 
-    function(errorMessage) {}
-  )
- .then(function() {
-  log("カメラ起動成功");
+    scanLoop();
 
-  document.getElementById("startBtn").style.display = "none";
-  document.getElementById("stopBtn").style.display = "block";
-  document.getElementById("resetBtn").style.display = "block";
-})
-  .catch(function(err) {
+  } catch(err) {
     log("カメラ起動失敗\n" + err);
-    qr = null;
-  });
+    scanning = false;
+  }
+}
+
+function scanLoop() {
+  if (!scanning) return;
+
+  const video = document.getElementById("video");
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+
+  if (video.readyState === video.HAVE_ENOUGH_DATA) {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+      inversionAttempts: "dontInvert"
+    });
+
+    if (code && code.data) {
+      handleDecoded(code.data);
+    }
+  }
+
+  requestAnimationFrame(scanLoop);
+}
+
+function handleDecoded(decodedText) {
+  if (scannedSet.has(decodedText)) return;
+
+  scannedSet.add(decodedText);
+
+  document.getElementById("lastRead").innerText =
+    "読取成功\n✔ " + decodedText;
+
+  document.getElementById("count").innerText =
+    "読取件数：" + scannedSet.size + "件";
+
+  document.getElementById("scanList").innerHTML =
+    Array.from(scannedSet).reverse().map(function(item) {
+      return '<div class="readItem">' + item + '</div>';
+    }).join("");
+
+  sendToSheet(decodedText);
 }
 
 function stopQr() {
-  if (!qr) {
+  if (!scanning) {
     log("まだ起動していません");
     return;
   }
 
-qr.stop().then(function() {
-  qr.clear();
-  qr = null;
+  scanning = false;
+
+  const video = document.getElementById("video");
+  video.pause();
+  video.srcObject = null;
+
+  if (stream) {
+    stream.getTracks().forEach(function(track) {
+      track.stop();
+    });
+    stream = null;
+  }
+
   log("停止しました");
 
   document.getElementById("startBtn").style.display = "block";
   document.getElementById("stopBtn").style.display = "none";
   document.getElementById("resetBtn").style.display = "none";
-});
 }
 
 function resetScan() {
@@ -222,20 +237,18 @@ function resetScan() {
 
   document.getElementById("count").innerText = "読取件数：0件";
   document.getElementById("scanList").innerHTML = "";
+  document.getElementById("lastRead").innerText = "";
 
   log("読取履歴をリセットしました");
 }
 
 function sendToSheet(qrText) {
-  const mode = document.getElementById("mode").value;
-  const recTarget = document.getElementById("recTarget").value;
-
   const data = {
-    mode: mode,
+    mode: document.getElementById("mode").value,
     qr: qrText,
     user: document.getElementById("user").value,
     location: document.getElementById("location").value,
-    recTarget: recTarget
+    recTarget: document.getElementById("recTarget").value
   };
 
   fetch(GAS_URL, {

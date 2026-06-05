@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+
+<title>QRテスト</title>
+</head>
+
+<body>
+
+<h2>QRカメラテスト</h2>
+
+<button onclick="startQr()">カメラ起動</button>
+
+<div id="status">未クリック</div>
+
+<div id="reader" style="width:350px;"></div>
+
+<script>
+
+function log(msg){
+ document.getElementById("status").innerHTML = msg;
+}
+
+function startQr(){
+
+ log("カメラ要求中...");
+
+ const qr = new Html5Qrcode("reader");
+
+ qr.start(
+   { facingMode: "environment" },
+   {
+     fps: 10,
+     qrbox: 250
+   },
+   function(decodedText){
+     log("読取成功<br>" + decodedText);
+   },
+   function(errorMessage){}
+ )
+ .then(()=>{
+   log("カメラ起動成功");
+ })
+ .catch((err)=>{
+   log("失敗<br>" + err);
+ });
+}
+
+</script>
+
+</body>
+</html>

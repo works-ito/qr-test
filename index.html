@@ -7,20 +7,56 @@
 <title>QR連続読取</title>
 
 <style>
-body { font-family:sans-serif; font-size:22px; padding:20px; }
-button, select, input {
-  font-size:24px; padding:14px; width:100%;
-  margin-bottom:12px; box-sizing:border-box;
+body {
+  font-family: sans-serif;
+  font-size: 22px;
+  padding: 20px;
 }
-#reader { width:100%; max-width:420px; margin-top:15px; }
-#status { color:blue; font-weight:bold; white-space:pre-wrap; }
+
+button, select, input {
+  font-size: 24px;
+  padding: 14px;
+  width: 100%;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+}
+
+#reader {
+  width: 100%;
+  max-width: 420px;
+  margin-top: 15px;
+}
+
+#status {
+  color: blue;
+  font-weight: bold;
+  white-space: pre-wrap;
+  margin: 10px 0;
+}
+
+#count {
+  font-size: 28px;
+  font-weight: bold;
+  margin: 14px 0 8px;
+}
+
+#scanList {
+  font-size: 28px;
+  line-height: 1.5;
+  margin-top: 8px;
+  white-space: pre-wrap;
+}
+
+.readItem {
+  margin-bottom: 4px;
+}
 </style>
 </head>
 
 <body>
 <h2>QR連続読取</h2>
 
-  <select id="mode" onchange="toggleRecTarget()">
+<select id="mode" onchange="toggleRecTarget()">
   <option value="出庫">出庫</option>
   <option value="返却">返却</option>
   <option value="修理">修理</option>
@@ -53,11 +89,10 @@ button, select, input {
 <button onclick="resetScan()">読取リセット</button>
 
 <div id="status">未クリック</div>
-<div id="reader"></div>
-<div id="count" style="font-size:24px; font-weight:bold; margin:10px 0;">
-  読取件数：0件
-</div>
 
+<div id="reader"></div>
+
+<div id="count">読取件数：0件</div>
 <div id="scanList"></div>
 
 <script>
@@ -73,9 +108,11 @@ function log(msg) {
 function toggleRecTarget() {
   const mode = document.getElementById("mode").value;
   const recModes = ["校正中", "校正完了", "交換完了"];
+
   document.getElementById("recTargetBox").style.display =
     recModes.includes(mode) ? "block" : "none";
 }
+
 function playBeep(type) {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -88,15 +125,15 @@ function playBeep(type) {
     gain.connect(ctx.destination);
 
     osc.frequency.value = (type === "success") ? 1600 : 220;
-    gain.gain.value = 0.6;
+    gain.gain.value = 0.8;
 
     osc.start();
-    osc.stop(ctx.currentTime + (type === "success" ? 0.25 : 0.25));
-
+    osc.stop(ctx.currentTime + 0.3);
   } catch(e) {
     console.log(e);
   }
 }
+
 function startQr() {
   log("カメラ起動中...");
 
@@ -110,18 +147,25 @@ function startQr() {
   qr.start(
     { facingMode: "environment" },
     { fps: 10, qrbox: { width: 250, height: 250 } },
+
     function(decodedText) {
-      if (scannedSet.has(decodedText)) return;
+      if (scannedSet.has(decodedText)) {
+        return;
+      }
 
-scannedSet.add(decodedText);
+      scannedSet.add(decodedText);
 
-document.getElementById("count").innerText =
-  "読取件数：" + scannedSet.size + "件";
-document.getElementById("scanList").innerHTML +=
-  "<div>" + decodedText + "</div>";
-document.getElementById("result").innerText += decodedText + "\n";
-sendToSheet(decodedText);
+      document.getElementById("count").innerText =
+        "読取件数：" + scannedSet.size + "件";
+
+      document.getElementById("scanList").innerHTML =
+        Array.from(scannedSet).map(function(item) {
+          return '<div class="readItem">' + item + '</div>';
+        }).join("");
+
+      sendToSheet(decodedText);
     },
+
     function(errorMessage) {}
   )
   .then(function() {
@@ -148,8 +192,10 @@ function stopQr() {
 
 function resetScan() {
   scannedSet.clear();
-  document.getElementById("result").innerText = "";
+
   document.getElementById("count").innerText = "読取件数：0件";
+  document.getElementById("scanList").innerHTML = "";
+
   log("読取履歴をリセットしました");
 }
 
@@ -175,9 +221,9 @@ function sendToSheet(qrText) {
   playBeep("success");
 
   if (navigator.vibrate) {
-  navigator.vibrate(100);
-}
-  
+    navigator.vibrate(100);
+  }
+
   log("送信しました\n" + qrText);
 }
 

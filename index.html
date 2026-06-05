@@ -84,9 +84,9 @@ button, select, input {
 
 <input id="user" placeholder="担当者名">
 
-<button onclick="startQr()">カメラ起動</button>
-<button onclick="stopQr()">停止</button>
-<button onclick="resetScan()">読取リセット</button>
+<button id="startBtn" onclick="startQr()">カメラ起動</button>
+<button id="stopBtn" onclick="stopQr()" style="display:none;">停止</button>
+<button id="resetBtn" onclick="resetScan()" style="display:none;">読取リセット</button>
 
 <div id="status">未クリック</div>
 
@@ -168,9 +168,13 @@ function startQr() {
 
     function(errorMessage) {}
   )
-  .then(function() {
-    log("カメラ起動成功");
-  })
+ .then(function() {
+  log("カメラ起動成功");
+
+  document.getElementById("startBtn").style.display = "none";
+  document.getElementById("stopBtn").style.display = "block";
+  document.getElementById("resetBtn").style.display = "block";
+})
   .catch(function(err) {
     log("カメラ起動失敗\n" + err);
     qr = null;
@@ -183,11 +187,15 @@ function stopQr() {
     return;
   }
 
-  qr.stop().then(function() {
-    qr.clear();
-    qr = null;
-    log("停止しました");
-  });
+qr.stop().then(function() {
+  qr.clear();
+  qr = null;
+  log("停止しました");
+
+  document.getElementById("startBtn").style.display = "block";
+  document.getElementById("stopBtn").style.display = "none";
+  document.getElementById("resetBtn").style.display = "none";
+});
 }
 
 function resetScan() {

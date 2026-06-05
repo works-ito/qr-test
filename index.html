@@ -21,7 +21,11 @@ button, select, input {
 <body>
 <h2>QR連続読取</h2>
 
-<select id="mode" onchange="toggleRecTarget()">
+  <div id="count" style="font-size:24px; font-weight:bold; margin:10px 0;">
+  読取件数：0件
+</div>
+
+  <select id="mode" onchange="toggleRecTarget()">
   <option value="出庫">出庫</option>
   <option value="返却">返却</option>
   <option value="修理">修理</option>
@@ -110,9 +114,13 @@ function startQr() {
     function(decodedText) {
       if (scannedSet.has(decodedText)) return;
 
-      scannedSet.add(decodedText);
-      document.getElementById("result").innerText += decodedText + "\n";
-      sendToSheet(decodedText);
+scannedSet.add(decodedText);
+
+document.getElementById("count").innerText =
+  "読取件数：" + scannedSet.size + "件";
+
+document.getElementById("result").innerText += decodedText + "\n";
+sendToSheet(decodedText);
     },
     function(errorMessage) {}
   )
@@ -141,6 +149,7 @@ function stopQr() {
 function resetScan() {
   scannedSet.clear();
   document.getElementById("result").innerText = "";
+  document.getElementById("count").innerText = "読取件数：0件";
   log("読取履歴をリセットしました");
 }
 

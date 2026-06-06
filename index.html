@@ -380,7 +380,8 @@ function sendToSheet(qrText) {
   log("読取成功");
 }
   function sendMemo() {
-  const memo = document.getElementById("memoText").value.trim();
+  const memoTextArea = document.getElementById("memoText");
+  const memo = memoTextArea.value.trim();
 
   if (!lastItemForMemo) {
     alert("追記対象がありません");
@@ -392,15 +393,22 @@ function sendToSheet(qrText) {
     return;
   }
 
+  // nullにする前に退避しておく
+  const savedItem = lastItemForMemo;
+  const savedTarget =
+    savedItem.機種表示 + " / " + savedItem.管理番号;
+
   const data = {
     action: "addMemo",
-    kanriNo: lastItemForMemo.管理番号,
-    kubun: lastItemForMemo.管理区分,
-    kishu: lastItemForMemo.機種表示,
-    sendId: lastItemForMemo.送信ID,
+    kanriNo: savedItem.管理番号,
+    kubun: savedItem.管理区分,
+    kishu: savedItem.機種表示,
+    sendId: savedItem.送信ID,
     memo: memo,
     user: document.getElementById("user").value
   };
+
+  log("追記保存中...");
 
   fetch(GAS_URL, {
     method: "POST",
@@ -411,26 +419,34 @@ function sendToSheet(qrText) {
     return response.json();
   })
   .then(function(result) {
-   if (result.ok) {
-  const savedTarget =
-    lastItemForMemo.機種表示 + " / " + lastItemForMemo.管理番号;
+    if (result.ok) {
+      alert("追記を保存しました\n" + savedTarget);
 
-  alert("追記を保存しました\n" + savedTarget);
+      memoTextArea.value = "";
+      memoTextArea.blur();
 
-  document.getElementById("memoText").value = "";
+      document.getElementById("memoTarget").innerText =
+        "追記保存済：" + savedTarget + "\n次のQRを読んでください";
 
-  document.getElementById("memoTarget").innerText =
-    "追記保存済：" + savedTarget + "\n次のQRを読んでください";
+      log("追記保存済\n次のQRを読んでください");
 
-  log("追記保存済\n次のQRを読んでください");
+      lastItemForMemo = null;
 
-  lastItemForMemo = null;
-} else {
+      // 追記保存後、カメラを自動復帰
+      setTimeout(function() {
+        if (!scanning) {
+          startQr();
+        }
+      }, 500);
+
+    } else {
       alert("追記保存失敗\n" + result.message);
+      log("追記保存失敗");
     }
   })
   .catch(function(err) {
     alert("追記保存エラー\n" + err);
+    log("追記保存エラー");
   });
 }
 function sendUndoToSheet(qrText) {

@@ -299,7 +299,7 @@ function undoLastScan() {
 
   document.getElementById("lastRead").innerText =
     "取消しました\n✖ " + lastScanned;
-
+sendUndoToSheet(lastScanned);
   log("取消しました");
 
   // GASはまだ未実装。あとでここから取消ログ送信する
@@ -335,7 +335,23 @@ function sendToSheet(qrText) {
 
   log("読取成功");
 }
+function sendUndoToSheet(qrText) {
+  const data = {
+    mode: "取消",
+    qr: qrText,
+    user: document.getElementById("user").value,
+    location: document.getElementById("location").value,
+    recTarget: document.getElementById("recTarget").value
+  };
 
+  fetch(GAS_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify(data)
+  });
+}
+  
 document.getElementById("mode").addEventListener("change", saveSelections);
 document.getElementById("location").addEventListener("change", saveSelections);
 document.getElementById("user").addEventListener("change", saveSelections);

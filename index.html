@@ -27,6 +27,21 @@ button, select, input {
 #scanList { font-size:28px; line-height:1.5; margin-top:8px; white-space:pre-wrap; }
 .readItem { margin-bottom:4px; }
 canvas { display:none; }
+  #memoArea {
+  display:none;
+  margin-top:20px;
+  padding:12px;
+  border:2px solid #333;
+  background:#fffbe6;
+}
+textarea {
+  font-size:22px;
+  padding:12px;
+  width:100%;
+  height:100px;
+  box-sizing:border-box;
+  margin-bottom:12px;
+}
 </style>
 </head>
 
@@ -83,7 +98,13 @@ canvas { display:none; }
 
 <div id="count">読取件数：0件</div>
 <div id="scanList"></div>
-
+<div id="memoArea">
+  <div>追記対象：</div>
+  <div id="memoTarget" style="font-weight:bold; margin-bottom:10px;"></div>
+  <textarea id="memoText" placeholder="燃料不足・付属品未返却・破損あり等"></textarea>
+  <button onclick="sendMemo()">追記を保存</button>
+</div>
+  
 <script>
 const GAS_URL = "https://script.google.com/macros/s/AKfycbyx4OYpiyIgKOxLqBFkJIiTaJ0wSF6Hrp12Krkd7MNL996uySBdA6o-d2F4dkT95Be1Vw/exec";
 
@@ -92,6 +113,7 @@ let scanning = false;
 let scannedSet = new Set();
 let lastScanned = "";
 let lastScanTime = 0;
+let lastItemForMemo = null;
 const SCAN_INTERVAL = 80;
   
 function log(msg) {
@@ -322,9 +344,29 @@ function sendToSheet(qrText) {
 
   fetch(GAS_URL, {
     method: "POST",
-    mode: "no-cors",
     headers: { "Content-Type": "text/plain" },
     body: JSON.stringify(data)
+  })
+  .then(function(response) {
+    return response.json();
+  })
+  .then(function(result) {
+    if (!result.ok) {
+      alert("送信失敗\n" + result.message);
+      return;
+    }
+
+    if (result.lastItem) {
+      lastItemForMemo = result.lastItem;
+
+      document.getElementById("memoTarget").innerText =
+        lastItemForMemo.機種表示 + " / " + lastItemForMemo.管理番号;
+
+      document.getElementById("memoArea").style.display = "block";
+    }
+  })
+  .catch(function(err) {
+    alert("送信エラー\n" + err);
   });
 
   playBeep("success");
@@ -334,6 +376,50 @@ function sendToSheet(qrText) {
   }
 
   log("読取成功");
+}
+  function sendMemo() {
+  const memo = document.getElementById("memoText").value.trim();
+
+  if (!lastItemForMemo) {
+    alert("追記対象がありません");
+    return;
+  }
+
+  if (!memo) {
+    alert("追記内容を入力してください");
+    return;
+  }
+
+  const data = {
+    action: "addMemo",
+    kanriNo: lastItemForMemo.管理番号,
+    kubun: lastItemForMemo.管理区分,
+    kishu: lastItemForMemo.機種表示,
+    sendId: lastItemForMemo.送信ID,
+    memo: memo,
+    user: document.getElementById("user").value
+  };
+
+  fetch(GAS_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify(data)
+  })
+  .then(function(response) {
+    return response.json();
+  })
+  .then(function(result) {
+    if (result.ok) {
+      alert("追記を保存しました");
+      document.getElementById("memoText").value = "";
+      document.getElementById("memoArea").style.display = "none";
+    } else {
+      alert("追記保存失敗\n" + result.message);
+    }
+  })
+  .catch(function(err) {
+    alert("追記保存エラー\n" + err);
+  });
 }
 function sendUndoToSheet(qrText) {
   const data = {

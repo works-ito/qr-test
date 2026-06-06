@@ -356,14 +356,16 @@ function sendToSheet(qrText) {
       return;
     }
 
-    if (result.lastItem) {
-      lastItemForMemo = result.lastItem;
+   if (result.lastItem) {
+  lastItemForMemo = result.lastItem;
 
-      document.getElementById("memoTarget").innerText =
-        lastItemForMemo.機種表示 + " / " + lastItemForMemo.管理番号;
+  document.getElementById("memoTarget").innerText =
+    "現在の追記対象：\n" +
+    lastItemForMemo.機種表示 + " / " + lastItemForMemo.管理番号;
 
-      document.getElementById("memoArea").style.display = "block";
-    }
+  document.getElementById("memoText").value = "";
+  document.getElementById("memoArea").style.display = "block";
+}
   })
   .catch(function(err) {
     alert("送信エラー\n" + err);
@@ -409,11 +411,21 @@ function sendToSheet(qrText) {
     return response.json();
   })
   .then(function(result) {
-    if (result.ok) {
-      alert("追記を保存しました");
-      document.getElementById("memoText").value = "";
-      document.getElementById("memoArea").style.display = "none";
-    } else {
+   if (result.ok) {
+  const savedTarget =
+    lastItemForMemo.機種表示 + " / " + lastItemForMemo.管理番号;
+
+  alert("追記を保存しました\n" + savedTarget);
+
+  document.getElementById("memoText").value = "";
+
+  document.getElementById("memoTarget").innerText =
+    "追記保存済：" + savedTarget + "\n次のQRを読んでください";
+
+  log("追記保存済\n次のQRを読んでください");
+
+  lastItemForMemo = null;
+} else {
       alert("追記保存失敗\n" + result.message);
     }
   })

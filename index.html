@@ -378,8 +378,7 @@ document.getElementById("memoArea").style.display = "block";
     recTarget: document.getElementById("recTarget").value
   };
 
-  document.getElementById("memoTarget").innerText =
-  "追記保存中...\n" + savedTarget;
+ 
   fetch(GAS_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain" },

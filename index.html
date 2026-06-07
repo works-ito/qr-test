@@ -114,6 +114,8 @@ let scannedSet = new Set();
 let lastScanned = "";
 let lastScanTime = 0;
 let lastItemForMemo = null;
+let loadingTimer = null;
+let loadingDots = 0;
 const SCAN_INTERVAL = 80;
   
 function log(msg) {

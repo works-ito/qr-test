@@ -391,6 +391,7 @@ startMemoLoading(qrText);
   
 document.getElementById("memoText").value = "";
 document.getElementById("memoText").disabled = false;
+document.querySelector("#memoArea button").disabled = true;
 document.getElementById("memoArea").style.display = "block";
   const data = {
     mode: document.getElementById("mode").value,
@@ -424,8 +425,9 @@ document.getElementById("memoArea").style.display = "block";
     lastItemForMemo.機種表示 + " / " + lastItemForMemo.管理番号;
 
   document.getElementById("memoText").value = "";
-  document.getElementById("memoText").disabled = false;
-  document.getElementById("memoArea").style.display = "block";
+document.getElementById("memoText").disabled = false;
+document.querySelector("#memoArea button").disabled = false;
+document.getElementById("memoArea").style.display = "block";
 }
   })
   .catch(function(err) {

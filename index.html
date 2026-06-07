@@ -119,6 +119,26 @@ const SCAN_INTERVAL = 80;
 function log(msg) {
   document.getElementById("status").innerText = msg;
 }
+function startMemoLoading(qrText) {
+  stopMemoLoading();
+
+  loadingDots = 0;
+
+  loadingTimer = setInterval(function() {
+    loadingDots = (loadingDots + 1) % 4;
+    const dots = ".".repeat(loadingDots);
+
+    document.getElementById("memoTarget").innerText =
+      "現在の追記対象：\n送信確認中" + dots + " / " + qrText;
+  }, 400);
+}
+
+function stopMemoLoading() {
+  if (loadingTimer) {
+    clearInterval(loadingTimer);
+    loadingTimer = null;
+  }
+}
 function saveSelections() {
   localStorage.setItem("mode", document.getElementById("mode").value);
   localStorage.setItem("location", document.getElementById("location").value);
@@ -334,6 +354,20 @@ sendUndoToSheet(lastScanned);
   }
 }
 function sendToSheet(qrText) {
+  lastItemForMemo = {
+  管理番号: qrText,
+  管理区分: "",
+  機種表示: "送信確認中",
+  送信ID: ""
+};
+
+document.getElementById("memoTarget").innerText =
+  "現在の追記対象：\n送信確認中 / " + qrText;
+startMemoLoading(qrText);
+  
+document.getElementById("memoText").value = "";
+document.getElementById("memoText").disabled = false;
+document.getElementById("memoArea").style.display = "block";
   const data = {
     mode: document.getElementById("mode").value,
     qr: qrText,
@@ -357,6 +391,7 @@ function sendToSheet(qrText) {
     }
 
    if (result.lastItem) {
+     stopMemoLoading();
   lastItemForMemo = result.lastItem;
 
   document.getElementById("memoTarget").innerText =
@@ -409,6 +444,8 @@ function sendToSheet(qrText) {
     user: document.getElementById("user").value
   };
 
+    memoTextArea.disabled = true;
+document.querySelector("#memoArea button").disabled = true;
   log("追記保存中...");
 
   fetch(GAS_URL, {
@@ -434,20 +471,30 @@ function sendToSheet(qrText) {
 
       lastItemForMemo = null;
 
+      document.querySelector("#memoArea button").disabled = false;
+      
       // 追記保存後、カメラを自動復帰
       setTimeout(function() {
   restartQrCamera();
 }, 500);
 
-    } else {
-      alert("追記保存失敗\n" + result.message);
-      log("追記保存失敗");
-    }
+  } else {
+
+  memoTextArea.disabled = false;
+  document.querySelector("#memoArea button").disabled = false;
+
+  alert("追記保存失敗\n" + result.message);
+  log("追記保存失敗");
+}
   })
   .catch(function(err) {
-    alert("追記保存エラー\n" + err);
-    log("追記保存エラー");
-  });
+
+  memoTextArea.disabled = false;
+  document.querySelector("#memoArea button").disabled = false;
+
+  alert("追記保存エラー\n" + err);
+  log("追記保存エラー");
+});
 }
   function restartQrCamera() {
   scanning = false;

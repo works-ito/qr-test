@@ -434,10 +434,8 @@ function sendToSheet(qrText) {
 
       // 追記保存後、カメラを自動復帰
       setTimeout(function() {
-        if (!scanning) {
-          startQr();
-        }
-      }, 500);
+  restartQrCamera();
+}, 500);
 
     } else {
       alert("追記保存失敗\n" + result.message);
@@ -449,6 +447,28 @@ function sendToSheet(qrText) {
     log("追記保存エラー");
   });
 }
+  function restartQrCamera() {
+  scanning = false;
+
+  const video = document.getElementById("video");
+
+  if (video) {
+    video.pause();
+    video.srcObject = null;
+  }
+
+  if (stream) {
+    stream.getTracks().forEach(function(track) {
+      track.stop();
+    });
+    stream = null;
+  }
+
+  setTimeout(function() {
+    startQr();
+  }, 300);
+}
+  
 function sendUndoToSheet(qrText) {
   const data = {
     mode: "取消",

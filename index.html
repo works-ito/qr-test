@@ -408,6 +408,7 @@ document.getElementById("memoArea").style.display = "block";
 }
   })
   .catch(function(err) {
+    stopMemoLoading();
     alert("送信エラー\n" + err);
   });
 
@@ -462,6 +463,8 @@ document.querySelector("#memoArea button").disabled = true;
   })
   .then(function(result) {
     if (result.ok) {
+      stopMemoLoading();
+      
       alert("追記を保存しました\n" + savedTarget);
 
       memoTextArea.value = "";
@@ -483,7 +486,8 @@ document.querySelector("#memoArea button").disabled = true;
 }, 500);
 
   } else {
-
+  stopMemoLoading();
+      
   memoTextArea.disabled = false;
   document.querySelector("#memoArea button").disabled = false;
 

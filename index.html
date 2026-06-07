@@ -267,8 +267,29 @@ function scanLoop() {
   }
 }
 
+function isValidQrText(text) {
+  text = String(text).trim();
 
+  // GoogleフォームURL形式なら許可
+  if (text.includes("entry.") && text.includes("=")) {
+    return true;
+  }
+
+  // REC03-4006 みたいな管理番号形式なら許可
+  if (/^[A-Z0-9]{2,10}-[A-Z0-9]{1,10}$/.test(text)) {
+    return true;
+  }
+
+  return false;
+}
 function handleDecoded(decodedText) {
+  decodedText = String(decodedText).trim();
+
+  if (!isValidQrText(decodedText)) {
+    log("QR形式ではないため無視しました\n" + decodedText);
+    return;
+  }
+
   if (scannedSet.has(decodedText)) return;
 
   scannedSet.add(decodedText);

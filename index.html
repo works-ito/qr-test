@@ -364,6 +364,7 @@ function sendToSheet(qrText) {
     lastItemForMemo.機種表示 + " / " + lastItemForMemo.管理番号;
 
   document.getElementById("memoText").value = "";
+  document.getElementById("memoText").disabled = false;
   document.getElementById("memoArea").style.display = "block";
 }
   })
@@ -425,6 +426,7 @@ function sendToSheet(qrText) {
       memoTextArea.value = "";
       memoTextArea.blur();
 
+      document.getElementById("memoText").disabled = true;
       document.getElementById("memoTarget").innerText =
         "追記保存済：" + savedTarget + "\n次のQRを読んでください";
 

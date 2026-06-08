@@ -531,6 +531,7 @@ async function sendBatchToSheet() {
 
   alert("まとめて送信完了\n" + success + "件");
 
+  stopQr();
   resetScan();
   log("送信完了\n次の読取はカメラ起動を押してください");
 
@@ -606,6 +607,7 @@ async function sendReturnBatchAfterMemo() {
 
   alert("返却まとめて送信完了\n" + success + "件\n\n案件追記：" + pendingReturnMemo);
 
+  stopQr();
   resetScan();
   log("返却送信完了\n次の読取はカメラ起動を押してください");
 

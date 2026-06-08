@@ -89,7 +89,10 @@ textarea {
 <button id="stopBtn" onclick="stopQr()" style="display:none;">停止</button>
 <button id="resetBtn" onclick="resetScan()" style="display:none;">読取リセット</button>
 <button id="undoBtn" onclick="undoLastScan()" style="display:none;">最後の読取取消</button>
-
+<button id="sendBatchBtn" onclick="sendBatchToSheet()" style="display:none;">
+  読取分をまとめて送信
+</button>
+  
 <div id="status">未クリック</div>
 <div id="lastRead"></div>
 
@@ -117,6 +120,11 @@ let lastItemForMemo = null;
 let loadingTimer = null;
 let loadingDots = 0;
 const SCAN_INTERVAL = 80;
+const FAST_MODES = ["出庫", "完成機"];
+
+function isFastMode() {
+  return FAST_MODES.includes(document.getElementById("mode").value);
+}
   
 function log(msg) {
   document.getElementById("status").innerText = msg;
@@ -307,13 +315,21 @@ document.getElementById("undoBtn").style.display = "block";
       return '<div class="readItem">' + item + '</div>';
     }).join("");
 
-  sendToSheet(decodedText);
+if (isFastMode()) {
+  document.getElementById("sendBatchBtn").style.display = "block";
+  document.getElementById("memoArea").style.display = "none";
 
-const mode = document.getElementById("mode").value;
+  playBeep("success");
+  if (navigator.vibrate) {
+    navigator.vibrate(100);
+  }
 
-if (mode !== "出庫" && mode !== "完成機") {
-  stopQr();
+  log("読取中：最後にまとめて送信してください");
+  return;
 }
+
+sendToSheet(decodedText);
+stopQr();
 }
   
 function stopQr() {
@@ -380,6 +396,82 @@ sendUndoToSheet(lastScanned);
   if (scannedSet.size === 0) {
     document.getElementById("undoBtn").style.display = "none";
   }
+}
+  async function sendBatchToSheet() {
+  const items = Array.from(scannedSet);
+
+  if (items.length === 0) {
+    alert("送信するQRがありません");
+    return;
+  }
+
+  if (!isFastMode()) {
+    alert("まとめて送信は出庫・完成機のみです");
+    return;
+  }
+
+  if (!document.getElementById("user").value) {
+    alert("担当者を選択してください");
+    return;
+  }
+
+  const mode = document.getElementById("mode").value;
+
+  if (!confirm(mode + "を " + items.length + "件まとめて送信します。よろしいですか？")) {
+    return;
+  }
+
+  document.getElementById("sendBatchBtn").disabled = true;
+  log("まとめて送信中...");
+
+  let success = 0;
+  let failed = [];
+
+  for (const qrText of items) {
+    try {
+      const result = await sendFastItem(qrText);
+
+      if (result.ok) {
+        success++;
+      } else {
+        failed.push(qrText + "：" + result.message);
+      }
+    } catch (err) {
+      failed.push(qrText + "：" + err);
+    }
+  }
+
+  document.getElementById("sendBatchBtn").disabled = false;
+
+  if (failed.length > 0) {
+    alert("一部送信失敗\n成功：" + success + "件\n失敗：" + failed.length + "件\n\n" + failed.join("\n"));
+    log("一部送信失敗あり");
+    return;
+  }
+
+  alert("まとめて送信完了\n" + success + "件");
+
+  resetScan();
+  document.getElementById("sendBatchBtn").style.display = "none";
+  log("送信完了");
+}
+
+function sendFastItem(qrText) {
+  const data = {
+    mode: document.getElementById("mode").value,
+    qr: qrText,
+    user: document.getElementById("user").value,
+    location: document.getElementById("location").value,
+    recTarget: document.getElementById("recTarget").value
+  };
+
+  return fetch(GAS_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify(data)
+  }).then(function(response) {
+    return response.json();
+  });
 }
 function sendToSheet(qrText) {
   lastItemForMemo = {

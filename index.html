@@ -532,11 +532,8 @@ async function sendBatchToSheet() {
   alert("まとめて送信完了\n" + success + "件");
 
   resetScan();
-  log("送信完了\nカメラを再起動します");
+  log("送信完了\n次の読取はカメラ起動を押してください");
 
-  setTimeout(function() {
-    restartQrCamera();
-  }, 500);
 }
 
 function showReturnCaseArea(items) {
@@ -610,11 +607,8 @@ async function sendReturnBatchAfterMemo() {
   alert("返却まとめて送信完了\n" + success + "件\n\n案件追記：" + pendingReturnMemo);
 
   resetScan();
-  log("返却送信完了\nカメラを再起動します");
+  log("返却送信完了\n次の読取はカメラ起動を押してください");
 
-  setTimeout(function() {
-    restartQrCamera();
-  }, 500);
 }
 
 function sendFastItem(qrText, extraData) {

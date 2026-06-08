@@ -308,6 +308,10 @@ document.getElementById("undoBtn").style.display = "block";
     }).join("");
 
   sendToSheet(decodedText);
+
+const mode = document.getElementById("mode").value;
+
+if (mode !== "出庫" && mode !== "完成機") {
   stopQr();
 }
 

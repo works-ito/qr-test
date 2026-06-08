@@ -17,11 +17,41 @@ button, select, input {
   color:green; font-size:34px; font-weight:bold;
   margin:10px 0; min-height:80px; white-space:pre-line;
 }
+#cameraBox {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+}
 #video {
   width:100%;
   max-width:320px;
   aspect-ratio: 1 / 1;
   object-fit: cover;
+}
+#scanFrame {
+  position:absolute;
+  left:25%;
+  top:25%;
+  width:50%;
+  height:50%;
+  pointer-events:none;
+}
+.corner {
+  position:absolute;
+  width:34px;
+  height:34px;
+  border-color:white;
+  border-style:solid;
+  border-width:0;
+  filter: drop-shadow(0 0 3px #000);
+}
+.corner.tl { left:0; top:0; border-left-width:5px; border-top-width:5px; }
+.corner.tr { right:0; top:0; border-right-width:5px; border-top-width:5px; }
+.corner.bl { left:0; bottom:0; border-left-width:5px; border-bottom-width:5px; }
+.corner.br { right:0; bottom:0; border-right-width:5px; border-bottom-width:5px; }
+#scanFrame.flash .corner {
+  border-color:#00ff00;
+  filter: drop-shadow(0 0 8px #00ff00);
 }
 #count { font-size:28px; font-weight:bold; margin:14px 0 8px; }
 #scanList { font-size:28px; line-height:1.5; margin-top:8px; white-space:pre-wrap; }
@@ -103,7 +133,15 @@ textarea {
 <div id="status">未クリック</div>
 <div id="lastRead"></div>
 
-<video id="video" playsinline></video>
+<div id="cameraBox">
+  <video id="video" playsinline></video>
+  <div id="scanFrame">
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+  </div>
+</div>
 <canvas id="canvas"></canvas>
 
 <div id="count">読取件数：0件</div>
@@ -163,6 +201,15 @@ function isFastMode() {
 
 function log(msg) {
   document.getElementById("status").innerText = msg;
+}
+
+function flashScanFrame() {
+  const frame = document.getElementById("scanFrame");
+  if (!frame) return;
+  frame.classList.add("flash");
+  setTimeout(function() {
+    frame.classList.remove("flash");
+  }, 180);
 }
 
 function startBatchLoading(message) {
@@ -313,7 +360,13 @@ function scanLoop() {
 
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    // 中央50%だけをQR解析対象にする
+    const sx = Math.floor(canvas.width * 0.25);
+    const sy = Math.floor(canvas.height * 0.25);
+    const sw = Math.floor(canvas.width * 0.50);
+    const sh = Math.floor(canvas.height * 0.50);
+
+    const imageData = ctx.getImageData(sx, sy, sw, sh);
     const code = jsQR(imageData.data, imageData.width, imageData.height, {
       inversionAttempts: "dontInvert"
     });
@@ -366,6 +419,7 @@ function handleDecoded(decodedText) {
 
   document.getElementById("undoBtn").style.display = "block";
   refreshScanDisplay(decodedText);
+  flashScanFrame();
 
   if (isFastMode()) {
     document.getElementById("sendBatchBtn").style.display = "block";
@@ -531,10 +585,12 @@ async function sendBatchToSheet() {
 
   alert("まとめて送信完了\n" + success + "件");
 
-  stopQr();
   resetScan();
-  log("送信完了\n次の読取はカメラ起動を押してください");
+  log("送信完了\nカメラを再起動します");
 
+  setTimeout(function() {
+    restartQrCamera();
+  }, 500);
 }
 
 function showReturnCaseArea(items) {
@@ -607,10 +663,12 @@ async function sendReturnBatchAfterMemo() {
 
   alert("返却まとめて送信完了\n" + success + "件\n\n案件追記：" + pendingReturnMemo);
 
-  stopQr();
   resetScan();
-  log("返却送信完了\n次の読取はカメラ起動を押してください");
+  log("返却送信完了\nカメラを再起動します");
 
+  setTimeout(function() {
+    restartQrCamera();
+  }, 500);
 }
 
 function sendFastItem(qrText, extraData) {

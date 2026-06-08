@@ -27,13 +27,23 @@ button, select, input {
 #scanList { font-size:28px; line-height:1.5; margin-top:8px; white-space:pre-wrap; }
 .readItem { margin-bottom:4px; }
 canvas { display:none; }
-  #memoArea {
+
+#memoArea {
   display:none;
   margin-top:20px;
   padding:12px;
   border:2px solid #333;
   background:#fffbe6;
 }
+
+#returnCaseArea {
+  display:none;
+  margin-top:20px;
+  padding:12px;
+  border:2px solid #333;
+  background:#eef;
+}
+
 textarea {
   font-size:22px;
   padding:12px;
@@ -61,7 +71,6 @@ textarea {
 
 <div id="recTargetBox" style="display:none;">
   <select id="recTarget">
-    <option value="本体">本体</option>
     <option value="騒音計">騒音計</option>
     <option value="振動計">振動計</option>
     <option value="内部USB">内部USB</option>
@@ -89,10 +98,8 @@ textarea {
 <button id="stopBtn" onclick="stopQr()" style="display:none;">停止</button>
 <button id="resetBtn" onclick="resetScan()" style="display:none;">読取リセット</button>
 <button id="undoBtn" onclick="undoLastScan()" style="display:none;">最後の読取取消</button>
-<button id="sendBatchBtn" onclick="sendBatchToSheet()" style="display:none;">
-  読取分をまとめて送信
-</button>
-  
+<button id="sendBatchBtn" onclick="sendBatchToSheet()" style="display:none;">読取分をまとめて送信</button>
+
 <div id="status">未クリック</div>
 <div id="lastRead"></div>
 
@@ -101,13 +108,32 @@ textarea {
 
 <div id="count">読取件数：0件</div>
 <div id="scanList"></div>
+
 <div id="memoArea">
   <div>追記対象：</div>
   <div id="memoTarget" style="font-weight:bold; margin-bottom:10px;"></div>
   <textarea id="memoText" placeholder="燃料不足・付属品未返却・破損あり等"></textarea>
   <button onclick="sendMemo()">追記を保存</button>
 </div>
-  
+
+<div id="returnCaseArea">
+  <div style="font-weight:bold; margin-bottom:10px;">返却案件の追記</div>
+
+  <label>
+    <input type="radio" name="returnMemoType" value="なし">
+    追記なし
+  </label><br>
+
+  <label>
+    <input type="radio" name="returnMemoType" value="あり">
+    追記あり
+  </label>
+
+  <textarea id="returnCaseMemo" placeholder="燃料不足・付属品不足・伝票写真あり等" style="display:none;"></textarea>
+
+  <button onclick="sendReturnBatchAfterMemo()">返却をまとめて送信</button>
+</div>
+
 <script>
 const GAS_URL = "https://script.google.com/macros/s/AKfycbyx4OYpiyIgKOxLqBFkJIiTaJ0wSF6Hrp12Krkd7MNL996uySBdA6o-d2F4dkT95Be1Vw/exec";
 
@@ -119,25 +145,30 @@ let lastScanTime = 0;
 let lastItemForMemo = null;
 let loadingTimer = null;
 let loadingDots = 0;
+
+let pendingReturnItems = [];
+let pendingReturnCaseId = "";
+let pendingReturnMemoType = "";
+let pendingReturnMemo = "";
+
 const SCAN_INTERVAL = 80;
-const FAST_MODES = ["出庫", "完成機"];
+const FAST_MODES = ["出庫", "完成機", "返却"];
 
 function isFastMode() {
   return FAST_MODES.includes(document.getElementById("mode").value);
 }
-  
+
 function log(msg) {
   document.getElementById("status").innerText = msg;
 }
+
 function startMemoLoading(qrText) {
   stopMemoLoading();
-
   loadingDots = 0;
 
   loadingTimer = setInterval(function() {
     loadingDots = (loadingDots + 1) % 4;
     const dots = ".".repeat(loadingDots);
-
     document.getElementById("memoTarget").innerText =
       "現在の追記対象：\n送信確認中" + dots + " / " + qrText;
   }, 400);
@@ -149,6 +180,7 @@ function stopMemoLoading() {
     loadingTimer = null;
   }
 }
+
 function saveSelections() {
   localStorage.setItem("mode", document.getElementById("mode").value);
   localStorage.setItem("location", document.getElementById("location").value);
@@ -169,14 +201,11 @@ function loadSelections() {
   if (localStorage.getItem("recTarget")) {
     document.getElementById("recTarget").value = localStorage.getItem("recTarget");
   }
+
+  if (!["騒音計", "振動計", "内部USB"].includes(document.getElementById("recTarget").value)) {
+    document.getElementById("recTarget").value = "騒音計";
+  }
 }
-
-document.getElementById("mode").addEventListener("change", saveSelections);
-document.getElementById("location").addEventListener("change", saveSelections);
-document.getElementById("user").addEventListener("change", saveSelections);
-document.getElementById("recTarget").addEventListener("change", saveSelections);
-
-loadSelections();
 
 function toggleRecTarget() {
   const mode = document.getElementById("mode").value;
@@ -236,7 +265,6 @@ async function startQr() {
     document.getElementById("resetBtn").style.display = "block";
 
     log("カメラ起動成功");
-
     scanLoop();
 
   } catch(err) {
@@ -278,18 +306,30 @@ function scanLoop() {
 function isValidQrText(text) {
   text = String(text).trim();
 
-  // GoogleフォームURL形式なら許可
   if (text.includes("entry.") && text.includes("=")) {
     return true;
   }
 
-  // REC03-4006 みたいな管理番号形式なら許可
   if (/^[A-Z0-9]{2,10}-[A-Z0-9]{1,10}$/.test(text)) {
     return true;
   }
 
   return false;
 }
+
+function refreshScanDisplay(decodedText) {
+  document.getElementById("lastRead").innerText =
+    "読取成功\n✔ " + decodedText;
+
+  document.getElementById("count").innerText =
+    "読取件数：" + scannedSet.size + "件";
+
+  document.getElementById("scanList").innerHTML =
+    Array.from(scannedSet).reverse().map(function(item) {
+      return '<div class="readItem">' + item + '</div>';
+    }).join("");
+}
+
 function handleDecoded(decodedText) {
   decodedText = String(decodedText).trim();
 
@@ -301,37 +341,29 @@ function handleDecoded(decodedText) {
   if (scannedSet.has(decodedText)) return;
 
   scannedSet.add(decodedText);
-lastScanned = decodedText;
-document.getElementById("undoBtn").style.display = "block";
+  lastScanned = decodedText;
 
-  document.getElementById("lastRead").innerText =
-    "読取成功\n✔ " + decodedText;
+  document.getElementById("undoBtn").style.display = "block";
+  refreshScanDisplay(decodedText);
 
-  document.getElementById("count").innerText =
-    "読取件数：" + scannedSet.size + "件";
+  if (isFastMode()) {
+    document.getElementById("sendBatchBtn").style.display = "block";
+    document.getElementById("memoArea").style.display = "none";
+    document.getElementById("returnCaseArea").style.display = "none";
 
-  document.getElementById("scanList").innerHTML =
-    Array.from(scannedSet).reverse().map(function(item) {
-      return '<div class="readItem">' + item + '</div>';
-    }).join("");
+    playBeep("success");
+    if (navigator.vibrate) {
+      navigator.vibrate(100);
+    }
 
-if (isFastMode()) {
-  document.getElementById("sendBatchBtn").style.display = "block";
-  document.getElementById("memoArea").style.display = "none";
-
-  playBeep("success");
-  if (navigator.vibrate) {
-    navigator.vibrate(100);
+    log("読取中：最後にまとめて送信してください");
+    return;
   }
 
-  log("読取中：最後にまとめて送信してください");
-  return;
+  sendToSheet(decodedText);
+  stopQr();
 }
 
-sendToSheet(decodedText);
-stopQr();
-}
-  
 function stopQr() {
   if (!scanning) {
     log("まだ起動していません");
@@ -360,13 +392,29 @@ function stopQr() {
 
 function resetScan() {
   scannedSet.clear();
+  lastScanned = "";
+  pendingReturnItems = [];
+  pendingReturnCaseId = "";
+  pendingReturnMemoType = "";
+  pendingReturnMemo = "";
 
   document.getElementById("count").innerText = "読取件数：0件";
   document.getElementById("scanList").innerHTML = "";
   document.getElementById("lastRead").innerText = "";
+  document.getElementById("sendBatchBtn").style.display = "none";
+  document.getElementById("sendBatchBtn").disabled = false;
+  document.getElementById("undoBtn").style.display = "none";
+  document.getElementById("returnCaseArea").style.display = "none";
+
+  document.getElementById("returnCaseMemo").value = "";
+  document.getElementById("returnCaseMemo").style.display = "none";
+  document.querySelectorAll('input[name="returnMemoType"]').forEach(function(radio) {
+    radio.checked = false;
+  });
 
   log("読取履歴をリセットしました");
 }
+
 function undoLastScan() {
   if (!lastScanned) {
     log("取消できる読取がありません");
@@ -385,19 +433,24 @@ function undoLastScan() {
 
   document.getElementById("lastRead").innerText =
     "取消しました\n✖ " + lastScanned;
-sendUndoToSheet(lastScanned);
-  log("取消しました");
 
-  // GASはまだ未実装。あとでここから取消ログ送信する
-  // sendUndoToSheet(lastScanned);
+  // すでに送信済みの通常モードだけ取消ログを送る。
+  // 出庫・完成機・返却は送信前の読みためなので取消ログは送らない。
+  if (!isFastMode()) {
+    sendUndoToSheet(lastScanned);
+  }
+
+  log("取消しました");
 
   lastScanned = "";
 
   if (scannedSet.size === 0) {
     document.getElementById("undoBtn").style.display = "none";
+    document.getElementById("sendBatchBtn").style.display = "none";
   }
 }
-  async function sendBatchToSheet() {
+
+async function sendBatchToSheet() {
   const items = Array.from(scannedSet);
 
   if (items.length === 0) {
@@ -406,7 +459,7 @@ sendUndoToSheet(lastScanned);
   }
 
   if (!isFastMode()) {
-    alert("まとめて送信は出庫・完成機のみです");
+    alert("まとめて送信は出庫・完成機・返却のみです");
     return;
   }
 
@@ -416,6 +469,11 @@ sendUndoToSheet(lastScanned);
   }
 
   const mode = document.getElementById("mode").value;
+
+  if (mode === "返却") {
+    showReturnCaseArea(items);
+    return;
+  }
 
   if (!confirm(mode + "を " + items.length + "件まとめて送信します。よろしいですか？")) {
     return;
@@ -452,11 +510,82 @@ sendUndoToSheet(lastScanned);
   alert("まとめて送信完了\n" + success + "件");
 
   resetScan();
-  document.getElementById("sendBatchBtn").style.display = "none";
   log("送信完了");
 }
 
-function sendFastItem(qrText) {
+function showReturnCaseArea(items) {
+  pendingReturnItems = items.slice();
+  pendingReturnCaseId = "RET-" + new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
+
+  document.getElementById("returnCaseArea").style.display = "block";
+  document.getElementById("sendBatchBtn").disabled = true;
+
+  log("返却追記を選択してください");
+}
+
+async function sendReturnBatchAfterMemo() {
+  const selected = document.querySelector('input[name="returnMemoType"]:checked');
+
+  if (!selected) {
+    alert("追記なし／追記ありを選択してください");
+    return;
+  }
+
+  pendingReturnMemoType = selected.value;
+  pendingReturnMemo = document.getElementById("returnCaseMemo").value.trim();
+
+  if (pendingReturnMemoType === "あり" && !pendingReturnMemo) {
+    alert("追記内容を入力してください");
+    return;
+  }
+
+  if (pendingReturnMemoType === "なし") {
+    pendingReturnMemo = "追記なし";
+  }
+
+  if (!confirm("返却を " + pendingReturnItems.length + "件まとめて送信します。よろしいですか？")) {
+    return;
+  }
+
+  document.querySelector("#returnCaseArea button").disabled = true;
+  log("返却まとめて送信中...");
+
+  let success = 0;
+  let failed = [];
+
+  for (const qrText of pendingReturnItems) {
+    try {
+      const result = await sendFastItem(qrText, {
+        returnCaseId: pendingReturnCaseId,
+        returnMemoType: pendingReturnMemoType,
+        returnMemo: pendingReturnMemo
+      });
+
+      if (result.ok) {
+        success++;
+      } else {
+        failed.push(qrText + "：" + result.message);
+      }
+    } catch (err) {
+      failed.push(qrText + "：" + err);
+    }
+  }
+
+  document.querySelector("#returnCaseArea button").disabled = false;
+
+  if (failed.length > 0) {
+    alert("一部送信失敗\n成功：" + success + "件\n失敗：" + failed.length + "件\n\n" + failed.join("\n"));
+    log("一部送信失敗あり");
+    return;
+  }
+
+  alert("返却まとめて送信完了\n" + success + "件\n\n案件追記：" + pendingReturnMemo);
+
+  resetScan();
+  log("返却送信完了");
+}
+
+function sendFastItem(qrText, extraData) {
   const data = {
     mode: document.getElementById("mode").value,
     qr: qrText,
@@ -464,6 +593,10 @@ function sendFastItem(qrText) {
     location: document.getElementById("location").value,
     recTarget: document.getElementById("recTarget").value
   };
+
+  if (extraData) {
+    Object.assign(data, extraData);
+  }
 
   return fetch(GAS_URL, {
     method: "POST",
@@ -473,22 +606,25 @@ function sendFastItem(qrText) {
     return response.json();
   });
 }
+
 function sendToSheet(qrText) {
   lastItemForMemo = {
-  管理番号: qrText,
-  管理区分: "",
-  機種表示: "送信確認中",
-  送信ID: ""
-};
+    管理番号: qrText,
+    管理区分: "",
+    機種表示: "送信確認中",
+    送信ID: ""
+  };
 
-document.getElementById("memoTarget").innerText =
-  "現在の追記対象：\n送信確認中 / " + qrText;
-startMemoLoading(qrText);
-  
-document.getElementById("memoText").value = "";
-document.getElementById("memoText").disabled = false;
-document.querySelector("#memoArea button").disabled = true;
-document.getElementById("memoArea").style.display = "block";
+  document.getElementById("memoTarget").innerText =
+    "現在の追記対象：\n送信確認中 / " + qrText;
+
+  startMemoLoading(qrText);
+
+  document.getElementById("memoText").value = "";
+  document.getElementById("memoText").disabled = false;
+  document.querySelector("#memoArea button").disabled = true;
+  document.getElementById("memoArea").style.display = "block";
+
   const data = {
     mode: document.getElementById("mode").value,
     qr: qrText,
@@ -497,7 +633,6 @@ document.getElementById("memoArea").style.display = "block";
     recTarget: document.getElementById("recTarget").value
   };
 
- 
   fetch(GAS_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain" },
@@ -512,19 +647,19 @@ document.getElementById("memoArea").style.display = "block";
       return;
     }
 
-   if (result.lastItem) {
-     stopMemoLoading();
-  lastItemForMemo = result.lastItem;
+    if (result.lastItem) {
+      stopMemoLoading();
+      lastItemForMemo = result.lastItem;
 
-  document.getElementById("memoTarget").innerText =
-    "現在の追記対象：\n" +
-    lastItemForMemo.機種表示 + " / " + lastItemForMemo.管理番号;
+      document.getElementById("memoTarget").innerText =
+        "現在の追記対象：\n" +
+        lastItemForMemo.機種表示 + " / " + lastItemForMemo.管理番号;
 
-  document.getElementById("memoText").value = "";
-document.getElementById("memoText").disabled = false;
-document.querySelector("#memoArea button").disabled = false;
-document.getElementById("memoArea").style.display = "block";
-}
+      document.getElementById("memoText").value = "";
+      document.getElementById("memoText").disabled = false;
+      document.querySelector("#memoArea button").disabled = false;
+      document.getElementById("memoArea").style.display = "block";
+    }
   })
   .catch(function(err) {
     stopMemoLoading();
@@ -539,7 +674,8 @@ document.getElementById("memoArea").style.display = "block";
 
   log("読取成功");
 }
-  function sendMemo() {
+
+function sendMemo() {
   const memoTextArea = document.getElementById("memoText");
   const memo = memoTextArea.value.trim();
 
@@ -553,10 +689,8 @@ document.getElementById("memoArea").style.display = "block";
     return;
   }
 
-  // nullにする前に退避しておく
   const savedItem = lastItemForMemo;
-  const savedTarget =
-    savedItem.機種表示 + " / " + savedItem.管理番号;
+  const savedTarget = savedItem.機種表示 + " / " + savedItem.管理番号;
 
   const data = {
     action: "addMemo",
@@ -568,8 +702,8 @@ document.getElementById("memoArea").style.display = "block";
     user: document.getElementById("user").value
   };
 
-    memoTextArea.disabled = true;
-document.querySelector("#memoArea button").disabled = true;
+  memoTextArea.disabled = true;
+  document.querySelector("#memoArea button").disabled = true;
   log("追記保存中...");
 
   fetch(GAS_URL, {
@@ -583,7 +717,7 @@ document.querySelector("#memoArea button").disabled = true;
   .then(function(result) {
     if (result.ok) {
       stopMemoLoading();
-      
+
       alert("追記を保存しました\n" + savedTarget);
 
       memoTextArea.value = "";
@@ -596,34 +730,32 @@ document.querySelector("#memoArea button").disabled = true;
       log("追記保存済\n次のQRを読んでください");
 
       lastItemForMemo = null;
-
       document.querySelector("#memoArea button").disabled = false;
-      
-      // 追記保存後、カメラを自動復帰
+
       setTimeout(function() {
-  restartQrCamera();
-}, 500);
+        restartQrCamera();
+      }, 500);
 
-  } else {
-  stopMemoLoading();
-      
-  memoTextArea.disabled = false;
-  document.querySelector("#memoArea button").disabled = false;
+    } else {
+      stopMemoLoading();
 
-  alert("追記保存失敗\n" + result.message);
-  log("追記保存失敗");
-}
+      memoTextArea.disabled = false;
+      document.querySelector("#memoArea button").disabled = false;
+
+      alert("追記保存失敗\n" + result.message);
+      log("追記保存失敗");
+    }
   })
   .catch(function(err) {
+    memoTextArea.disabled = false;
+    document.querySelector("#memoArea button").disabled = false;
 
-  memoTextArea.disabled = false;
-  document.querySelector("#memoArea button").disabled = false;
-
-  alert("追記保存エラー\n" + err);
-  log("追記保存エラー");
-});
+    alert("追記保存エラー\n" + err);
+    log("追記保存エラー");
+  });
 }
-  function restartQrCamera() {
+
+function restartQrCamera() {
   scanning = false;
 
   const video = document.getElementById("video");
@@ -644,7 +776,7 @@ document.querySelector("#memoArea button").disabled = true;
     startQr();
   }, 300);
 }
-  
+
 function sendUndoToSheet(qrText) {
   const data = {
     mode: "取消",
@@ -661,11 +793,24 @@ function sendUndoToSheet(qrText) {
     body: JSON.stringify(data)
   });
 }
-  
+
 document.getElementById("mode").addEventListener("change", saveSelections);
 document.getElementById("location").addEventListener("change", saveSelections);
 document.getElementById("user").addEventListener("change", saveSelections);
 document.getElementById("recTarget").addEventListener("change", saveSelections);
+
+document.querySelectorAll('input[name="returnMemoType"]').forEach(function(radio) {
+  radio.addEventListener("change", function() {
+    const memoBox = document.getElementById("returnCaseMemo");
+
+    if (this.value === "あり") {
+      memoBox.style.display = "block";
+    } else {
+      memoBox.style.display = "none";
+      memoBox.value = "";
+    }
+  });
+});
 
 loadSelections();
 toggleRecTarget();

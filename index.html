@@ -146,6 +146,9 @@ let lastItemForMemo = null;
 let loadingTimer = null;
 let loadingDots = 0;
 
+let batchLoadingTimer = null;
+let batchLoadingDots = 0;
+
 let pendingReturnItems = [];
 let pendingReturnCaseId = "";
 let pendingReturnMemoType = "";
@@ -160,6 +163,24 @@ function isFastMode() {
 
 function log(msg) {
   document.getElementById("status").innerText = msg;
+}
+
+function startBatchLoading(message) {
+  stopBatchLoading();
+  batchLoadingDots = 0;
+
+  batchLoadingTimer = setInterval(function() {
+    batchLoadingDots = (batchLoadingDots + 1) % 4;
+    const dots = ".".repeat(batchLoadingDots);
+    log(message + dots);
+  }, 400);
+}
+
+function stopBatchLoading() {
+  if (batchLoadingTimer) {
+    clearInterval(batchLoadingTimer);
+    batchLoadingTimer = null;
+  }
 }
 
 function startMemoLoading(qrText) {
@@ -480,7 +501,7 @@ async function sendBatchToSheet() {
   }
 
   document.getElementById("sendBatchBtn").disabled = true;
-  log("まとめて送信中...");
+  startBatchLoading("まとめて送信中");
 
   let success = 0;
   let failed = [];
@@ -499,6 +520,7 @@ async function sendBatchToSheet() {
     }
   }
 
+  stopBatchLoading();
   document.getElementById("sendBatchBtn").disabled = false;
 
   if (failed.length > 0) {
@@ -510,7 +532,11 @@ async function sendBatchToSheet() {
   alert("まとめて送信完了\n" + success + "件");
 
   resetScan();
-  log("送信完了");
+  log("送信完了\nカメラを再起動します");
+
+  setTimeout(function() {
+    restartQrCamera();
+  }, 500);
 }
 
 function showReturnCaseArea(items) {
@@ -547,8 +573,9 @@ async function sendReturnBatchAfterMemo() {
     return;
   }
 
-  document.querySelector("#returnCaseArea button").disabled = true;
-  log("返却まとめて送信中...");
+  const returnButton = document.querySelector("#returnCaseArea button");
+  returnButton.disabled = true;
+  startBatchLoading("返却まとめて送信中");
 
   let success = 0;
   let failed = [];
@@ -571,7 +598,8 @@ async function sendReturnBatchAfterMemo() {
     }
   }
 
-  document.querySelector("#returnCaseArea button").disabled = false;
+  stopBatchLoading();
+  returnButton.disabled = false;
 
   if (failed.length > 0) {
     alert("一部送信失敗\n成功：" + success + "件\n失敗：" + failed.length + "件\n\n" + failed.join("\n"));
@@ -582,7 +610,11 @@ async function sendReturnBatchAfterMemo() {
   alert("返却まとめて送信完了\n" + success + "件\n\n案件追記：" + pendingReturnMemo);
 
   resetScan();
-  log("返却送信完了");
+  log("返却送信完了\nカメラを再起動します");
+
+  setTimeout(function() {
+    restartQrCamera();
+  }, 500);
 }
 
 function sendFastItem(qrText, extraData) {

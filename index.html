@@ -819,10 +819,6 @@ function sendMemo() {
       lastItemForMemo = null;
       document.querySelector("#memoArea button").disabled = false;
 
-      setTimeout(function() {
-        restartQrCamera();
-      }, 500);
-
     } else {
       stopMemoLoading();
 

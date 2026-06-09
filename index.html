@@ -554,6 +554,8 @@ async function sendBatchToSheet() {
     return;
   }
 
+  stopQr();
+  
   document.getElementById("sendBatchBtn").disabled = true;
   startBatchLoading("まとめて送信中");
 
@@ -585,6 +587,7 @@ async function sendBatchToSheet() {
 
   alert("まとめて送信完了\n" + success + "件\n\n続けて読み取る場合は「カメラ起動」を押してください");
 
+stopQr();  
 resetScan();
 log("送信完了。続けて読み取る場合は「カメラ起動」を押してください");
 
@@ -666,6 +669,7 @@ alert(
   "\n\n続けて読み取る場合は『カメラ起動』を押してください"
 );
 
+stopQr();  
 resetScan();
 log("返却送信完了。続けて読み取る場合は『カメラ起動』を押してください");
 

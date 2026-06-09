@@ -583,14 +583,11 @@ async function sendBatchToSheet() {
     return;
   }
 
-  alert("まとめて送信完了\n" + success + "件");
+  alert("まとめて送信完了\n" + success + "件\n\n続けて読み取る場合は「カメラ起動」を押してください");
 
-  resetScan();
-  log("送信完了\nカメラを再起動します");
+resetScan();
+log("送信完了。続けて読み取る場合は「カメラ起動」を押してください");
 
-  setTimeout(function() {
-    restartQrCamera();
-  }, 500);
 }
 
 function showReturnCaseArea(items) {

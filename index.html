@@ -658,14 +658,18 @@ async function sendReturnBatchAfterMemo() {
     return;
   }
 
-  alert("返却まとめて送信完了\n" + success + "件\n\n案件追記：" + pendingReturnMemo);
+alert(
+  "返却まとめて送信完了\n" +
+  success +
+  "件\n\n案件追記：" +
+  pendingReturnMemo +
+  "\n\n続けて読み取る場合は『カメラ起動』を押してください"
+);
 
-  resetScan();
-  log("返却送信完了\nカメラを再起動します");
+resetScan();
+log("返却送信完了。続けて読み取る場合は『カメラ起動』を押してください");
 
-  setTimeout(function() {
-    restartQrCamera();
-  }, 500);
+
 }
 
 function sendFastItem(qrText, extraData) {

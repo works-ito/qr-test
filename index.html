@@ -348,6 +348,10 @@ async function startQr() {
       audio: false
     });
 
+    video.srcObject = stream;
+video.setAttribute("playsinline", true);
+await video.play();
+    
     scanning = true;
 
     document.getElementById("startBtn").style.display = "none";

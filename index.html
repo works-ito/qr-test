@@ -352,6 +352,20 @@ async function startQr() {
     video.setAttribute("playsinline", true);
     await video.play();
 
+    const track = stream.getVideoTracks()[0];
+
+try {
+  const capabilities = track.getCapabilities();
+
+  if (capabilities.torch) {
+    await track.applyConstraints({
+      advanced: [{ torch: true }]
+    });
+    log("ライトON");
+  }
+} catch (e) {
+  console.log("ライト制御不可", e);
+}
     scanning = true;
 
     document.getElementById("startBtn").style.display = "none";

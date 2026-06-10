@@ -352,6 +352,8 @@ async function startQr() {
 video.setAttribute("playsinline", true);
 await video.play();
 
+    log(video.videoWidth + " × " + video.videoHeight);
+    
     const track = stream.getVideoTracks()[0];
 const caps = track.getCapabilities ? track.getCapabilities() : {};
 

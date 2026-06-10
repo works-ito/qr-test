@@ -30,10 +30,10 @@ button, select, input {
 }
 #scanFrame {
   position:absolute;
-  left:32.5%;
-  top:32.5%;
-  width:35%;
-  height:35%;
+  left:30%;
+  top:30%;
+  width:40%;
+  height:40%;
   pointer-events:none;
 }
 .corner {
@@ -396,11 +396,11 @@ function scanLoop() {
 
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    // 中央35%だけをQR解析対象にする
-    const sx = Math.floor(canvas.width * 0.325);
-    const sy = Math.floor(canvas.height * 0.325);
-    const sw = Math.floor(canvas.width * 0.35);
-    const sh = Math.floor(canvas.height * 0.35);
+    // 中央40%だけをQR解析対象にする
+    const sx = Math.floor(canvas.width * 0.3);
+    const sy = Math.floor(canvas.height * 0.3);
+    const sw = Math.floor(canvas.width * 0.4);
+    const sh = Math.floor(canvas.height * 0.4);
 
     const imageData = ctx.getImageData(sx, sy, sw, sh);
     const code = jsQR(imageData.data, imageData.width, imageData.height, {

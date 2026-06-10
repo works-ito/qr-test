@@ -342,8 +342,8 @@ async function startQr() {
     stream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: { ideal: "environment" },
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
       },
       audio: false
     });
@@ -351,6 +351,16 @@ async function startQr() {
     video.srcObject = stream;
 video.setAttribute("playsinline", true);
 await video.play();
+
+    const track = stream.getVideoTracks()[0];
+const caps = track.getCapabilities ? track.getCapabilities() : {};
+
+if (caps.zoom) {
+  const zoomValue = Math.min(1.5, caps.zoom.max);
+  await track.applyConstraints({
+    advanced: [{ zoom: zoomValue }]
+  });
+}
     
     scanning = true;
 

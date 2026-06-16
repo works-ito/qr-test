@@ -216,6 +216,28 @@ textarea {
 
   <button onclick="sendReturnBatchAfterMemo()">返却をまとめて送信</button>
 </div>
+<div id="shipmentPhotoArea">
+  <div style="font-weight:bold; margin-bottom:10px;">出庫写真の添付</div>
+  <p>1枚目は出庫伝票の撮影推奨。最大6枚まで。</p>
+
+  <button onclick="skipShipmentPhotos()">写真なしで完了</button>
+
+  <input
+    type="file"
+    id="shipmentPhotoInput"
+    accept="image/*"
+    multiple
+    style="display:none;"
+    onchange="previewShipmentPhotos()"
+  >
+
+  <button onclick="chooseShipmentPhotos()">写真を選ぶ・撮影する</button>
+  <div id="shipmentPhotoPreview"></div>
+
+  <button id="uploadShipmentPhotoBtn" onclick="uploadShipmentPhotos()" style="display:none;">
+    写真を保存
+  </button>
+</div>
 
 <script>
 const GAS_URL = "https://script.google.com/macros/s/AKfycbyx4OYpiyIgKOxLqBFkJIiTaJ0wSF6Hrp12Krkd7MNL996uySBdA6o-d2F4dkT95Be1Vw/exec";

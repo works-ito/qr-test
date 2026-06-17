@@ -918,9 +918,9 @@ function makeShipmentCollage(files, info) {
 
     const cols = 3;
     const rows = 2;
-    const cellW = 760;
-    const cellH = 570;
-    const headerH = 140;
+    const cellW = 1100;
+    const cellH = 825;
+    const headerH = 180;
 
     const canvas = document.createElement("canvas");
     canvas.width = cols * cellW;
@@ -966,7 +966,7 @@ function makeShipmentCollage(files, info) {
       ctx.fillText((i + 1) + "枚目", x + 14, y + 32);
     }
 
-    resolve(canvas.toDataURL("image/jpeg", 0.85));
+    resolve(canvas.toDataURL("image/jpeg", 0.92));
   });
 }
 

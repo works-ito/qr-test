@@ -665,12 +665,19 @@ async function sendBatchToSheet() {
     return;
   }
 
-  alert("まとめて送信完了\n" + success + "件\n\n続けて読み取る場合は「カメラ起動」を押してください");
+alert("まとめて送信完了\n" + success + "件");
 
-stopQr();  
+const sentItems = items.slice();
+const sentMode = mode;
+
+stopQr();
 resetScan();
-log("送信完了。続けて読み取る場合は「カメラ起動」を押してください");
 
+if (sentMode === "出庫") {
+  showShipmentPhotoArea(sentItems);
+} else {
+  log("送信完了。続けて読み取る場合は「カメラ起動」を押してください");
+}
 }
 
 function showReturnCaseArea(items) {
@@ -777,7 +784,222 @@ function sendFastItem(qrText, extraData) {
     return response.json();
   });
 }
+function showShipmentPhotoArea(items) {
+  lastShipmentPhotoInfo = {
+    mode: "出庫",
+    ids: items.slice(),
+    user: document.getElementById("user").value,
+    location: document.getElementById("location").value,
+    createdAt: new Date().toISOString()
+  };
 
+  document.getElementById("shipmentPhotoArea").style.display = "block";
+  document.getElementById("shipmentPhotoPreview").innerText =
+    "出庫送信完了。\n写真を添付する場合は最大6枚まで選んでください。";
+  document.getElementById("uploadShipmentPhotoBtn").style.display = "none";
+  document.getElementById("shipmentPhotoInput").value = "";
+
+  log("出庫送信完了。写真添付を選択してください");
+}
+
+function chooseShipmentPhotos() {
+  document.getElementById("shipmentPhotoInput").click();
+}
+
+function previewShipmentPhotos() {
+  const input = document.getElementById("shipmentPhotoInput");
+  const files = Array.from(input.files || []);
+
+  if (files.length === 0) {
+    document.getElementById("shipmentPhotoPreview").innerText = "";
+    document.getElementById("uploadShipmentPhotoBtn").style.display = "none";
+    return;
+  }
+
+  if (files.length > 6) {
+    alert("写真は最大6枚までです");
+    input.value = "";
+    document.getElementById("shipmentPhotoPreview").innerText = "";
+    document.getElementById("uploadShipmentPhotoBtn").style.display = "none";
+    return;
+  }
+
+  document.getElementById("shipmentPhotoPreview").innerText =
+    files.length + "枚選択中\n1枚のコラージュ画像にして保存します。";
+
+  document.getElementById("uploadShipmentPhotoBtn").style.display = "block";
+}
+
+function skipShipmentPhotos() {
+  document.getElementById("shipmentPhotoArea").style.display = "none";
+  document.getElementById("shipmentPhotoInput").value = "";
+  document.getElementById("shipmentPhotoPreview").innerText = "";
+  document.getElementById("uploadShipmentPhotoBtn").style.display = "none";
+  lastShipmentPhotoInfo = null;
+
+  log("写真なしで完了しました。続けて読み取る場合は「カメラ起動」を押してください");
+}
+
+async function uploadShipmentPhotos() {
+  const input = document.getElementById("shipmentPhotoInput");
+  const files = Array.from(input.files || []);
+
+  if (!lastShipmentPhotoInfo) {
+    alert("出庫情報がありません");
+    return;
+  }
+
+  if (files.length === 0) {
+    alert("写真が選択されていません");
+    return;
+  }
+
+  if (files.length > 6) {
+    alert("写真は最大6枚までです");
+    return;
+  }
+
+  const btn = document.getElementById("uploadShipmentPhotoBtn");
+  btn.disabled = true;
+  log("写真をコラージュ化しています...");
+
+  try {
+    const collageBase64 = await makeShipmentCollage(files, lastShipmentPhotoInfo);
+
+    log("出庫写真を保存中...");
+
+    const data = {
+      action: "saveShipmentPhoto",
+      photoBase64: collageBase64,
+      photoInfo: lastShipmentPhotoInfo
+    };
+
+    const result = await fetch(GAS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify(data)
+    }).then(function(response) {
+      return response.json();
+    });
+
+    if (!result.ok) {
+      alert("写真保存失敗\n" + result.message);
+      log("写真保存失敗");
+      btn.disabled = false;
+      return;
+    }
+
+    alert("出庫写真を保存しました");
+
+    document.getElementById("shipmentPhotoArea").style.display = "none";
+    input.value = "";
+    document.getElementById("shipmentPhotoPreview").innerText = "";
+    btn.style.display = "none";
+    btn.disabled = false;
+    lastShipmentPhotoInfo = null;
+
+    log("写真保存完了。続けて読み取る場合は「カメラ起動」を押してください");
+
+  } catch (err) {
+    alert("写真保存エラー\n" + err);
+    log("写真保存エラー");
+    btn.disabled = false;
+  }
+}
+
+function makeShipmentCollage(files, info) {
+  return new Promise(async function(resolve) {
+    const images = [];
+
+    for (const file of files) {
+      const img = await loadPhotoImage(file);
+      images.push(img);
+    }
+
+    const cols = 3;
+    const rows = 2;
+    const cellW = 520;
+    const cellH = 390;
+    const headerH = 120;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = cols * cellW;
+    canvas.height = rows * cellH + headerH;
+
+    const ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "#000000";
+    ctx.font = "32px sans-serif";
+    ctx.fillText("出庫写真", 20, 42);
+
+    ctx.font = "22px sans-serif";
+    ctx.fillText("日時：" + new Date().toLocaleString("ja-JP"), 20, 76);
+    ctx.fillText("担当：" + (info.user || ""), 20, 104);
+
+    const idText = (info.ids || []).join(" ");
+    ctx.fillText("QR：" + idText.slice(0, 80), 360, 76);
+    if (idText.length > 80) {
+      ctx.fillText(idText.slice(80, 160), 360, 104);
+    }
+
+    for (let i = 0; i < 6; i++) {
+      const x = (i % cols) * cellW;
+      const y = Math.floor(i / cols) * cellH + headerH;
+
+      ctx.strokeStyle = "#cccccc";
+      ctx.strokeRect(x, y, cellW, cellH);
+
+      ctx.fillStyle = "#f5f5f5";
+      ctx.fillRect(x + 1, y + 1, cellW - 2, cellH - 2);
+
+      if (images[i]) {
+        drawImageCover(ctx, images[i], x, y, cellW, cellH);
+      }
+
+      ctx.fillStyle = "rgba(0,0,0,0.65)";
+      ctx.fillRect(x + 8, y + 8, 72, 34);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "22px sans-serif";
+      ctx.fillText((i + 1) + "枚目", x + 14, y + 32);
+    }
+
+    resolve(canvas.toDataURL("image/jpeg", 0.72));
+  });
+}
+
+function loadPhotoImage(file) {
+  return new Promise(function(resolve) {
+    const reader = new FileReader();
+
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = function() {
+        resolve(img);
+      };
+      img.src = e.target.result;
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+
+function drawImageCover(ctx, img, x, y, w, h) {
+  const scale = Math.max(w / img.width, h / img.height);
+  const nw = img.width * scale;
+  const nh = img.height * scale;
+  const nx = x + (w - nw) / 2;
+  const ny = y + (h - nh) / 2;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  ctx.drawImage(img, nx, ny, nw, nh);
+  ctx.restore();
+}
 function sendToSheet(qrText) {
   lastItemForMemo = {
     管理番号: qrText,

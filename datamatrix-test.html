@@ -5,57 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>QR / Data Matrix テスト</title>
 
-<script src="https://unpkg.com/@zxing/browser@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
 
 <style>
-body {
-  font-family: sans-serif;
-  font-size: 22px;
-  padding: 20px;
-}
-
+body { font-family:sans-serif; font-size:22px; padding:20px; }
 button {
-  font-size: 24px;
-  padding: 14px;
-  width: 100%;
-  margin-bottom: 12px;
-  box-sizing: border-box;
+  font-size:24px; padding:14px; width:100%;
+  margin-bottom:12px; box-sizing:border-box;
 }
-
-#status {
-  color: blue;
-  font-weight: bold;
-  white-space: pre-wrap;
-  margin: 10px 0;
-}
-
-#lastRead {
-  color: green;
-  font-size: 24px;
-  font-weight: bold;
-  white-space: pre-wrap;
-  margin: 10px 0;
-}
-
+#status { color:blue; font-weight:bold; white-space:pre-wrap; margin:10px 0; }
+#lastRead { color:green; font-size:24px; font-weight:bold; white-space:pre-wrap; margin:10px 0; }
 #video {
-  width: 100%;
-  max-width: 320px;
-  aspect-ratio: 1 / 1;
-  object-fit: cover;
-  background: #000;
+  width:100%;
+  max-width:360px;
+  aspect-ratio:1 / 1;
+  object-fit:cover;
+  background:#000;
 }
-
-#count {
-  font-size: 20px;
-  font-weight: bold;
-  margin: 12px 0 4px;
-}
-
-#scanList {
-  font-size: 26px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-}
+#count { font-size:20px; font-weight:bold; margin:12px 0 4px; }
+#scanList { font-size:26px; line-height:1.5; white-space:pre-wrap; }
 </style>
 </head>
 
@@ -76,7 +44,8 @@ button {
 
 <script>
 let codeReader = null;
-let controls = null;
+let selectedDeviceId = null;
+let scanning = false;
 let scannedSet = new Set();
 
 function log(msg) {
@@ -84,8 +53,7 @@ function log(msg) {
 }
 
 function refreshDisplay(text) {
-  document.getElementById("lastRead").innerText =
-    "読取成功 ✔\n" + text;
+  document.getElementById("lastRead").innerText = "読取成功 ✔\n" + text;
 
   document.getElementById("count").innerText =
     "読取件数：" + scannedSet.size + "件";
@@ -97,30 +65,44 @@ function refreshDisplay(text) {
 }
 
 async function startScan() {
+  if (scanning) {
+    log("すでに起動中");
+    return;
+  }
+
   try {
     log("カメラ起動中...");
 
     const hints = new Map();
-
     hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
       ZXing.BarcodeFormat.QR_CODE,
       ZXing.BarcodeFormat.DATA_MATRIX
     ]);
 
-    codeReader = new ZXingBrowser.BrowserMultiFormatReader(hints);
+    codeReader = new ZXing.BrowserMultiFormatReader(hints);
 
-    const video = document.getElementById("video");
+    const videoInputDevices = await codeReader.listVideoInputDevices();
 
-    controls = await codeReader.decodeFromConstraints(
-      {
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        },
-        audio: false
-      },
-      video,
+    if (!videoInputDevices || videoInputDevices.length === 0) {
+      throw new Error("カメラが見つかりません");
+    }
+
+    // できるだけ背面カメラを選ぶ
+    const backCamera = videoInputDevices.find(function(device) {
+      const label = (device.label || "").toLowerCase();
+      return label.includes("back") ||
+             label.includes("rear") ||
+             label.includes("environment") ||
+             label.includes("背面");
+    });
+
+    selectedDeviceId = backCamera
+      ? backCamera.deviceId
+      : videoInputDevices[videoInputDevices.length - 1].deviceId;
+
+    codeReader.decodeFromVideoDevice(
+      selectedDeviceId,
+      "video",
       function(result, err) {
         if (result) {
           const text = result.getText();
@@ -139,29 +121,29 @@ async function startScan() {
       }
     );
 
+    scanning = true;
     log("カメラ起動成功");
 
   } catch (err) {
+    scanning = false;
     log("カメラ起動失敗\n" + err);
   }
 }
 
 function stopScan() {
-  if (controls) {
-    controls.stop();
-    controls = null;
+  if (codeReader) {
+    codeReader.reset();
   }
 
+  scanning = false;
   log("停止しました");
 }
 
 function resetScan() {
   scannedSet.clear();
-
   document.getElementById("lastRead").innerText = "";
   document.getElementById("count").innerText = "読取件数：0件";
   document.getElementById("scanList").innerHTML = "";
-
   log("リセットしました");
 }
 </script>

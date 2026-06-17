@@ -222,16 +222,27 @@ textarea {
 
   <button onclick="skipShipmentPhotos()">写真なしで完了</button>
 
-  <input
-    type="file"
-    id="shipmentPhotoInput"
-    accept="image/*"
-    multiple
-    style="display:none;"
-    onchange="previewShipmentPhotos()"
-  >
+<input
+  type="file"
+  id="shipmentCameraInput"
+  accept="image/*"
+  capture="environment"
+  style="display:none;"
+  onchange="addShipmentCameraPhoto()"
+>
 
-  <button onclick="chooseShipmentPhotos()">写真を選ぶ・撮影する</button>
+<input
+  type="file"
+  id="shipmentLibraryInput"
+  accept="image/*"
+  multiple
+  style="display:none;"
+  onchange="addShipmentLibraryPhotos()"
+>
+
+<button onclick="chooseShipmentCamera()">カメラで1枚追加</button>
+<button onclick="chooseShipmentLibrary()">ライブラリから選ぶ</button>
+<button onclick="clearShipmentPhotos()">選択写真をクリア</button>
   <div id="shipmentPhotoPreview"></div>
 
   <button id="uploadShipmentPhotoBtn" onclick="uploadShipmentPhotos()" style="display:none;">
@@ -259,6 +270,7 @@ let pendingReturnCaseId = "";
 let pendingReturnMemoType = "";
 let pendingReturnMemo = "";
 let lastShipmentPhotoInfo = null;
+let selectedShipmentPhotos = [];
   
 const SCAN_INTERVAL = 80;
 const FAST_MODES = ["出庫", "完成機", "返却", "修理中"];
@@ -793,56 +805,106 @@ function showShipmentPhotoArea(items) {
     createdAt: new Date().toISOString()
   };
 
+  selectedShipmentPhotos = [];
+
   document.getElementById("shipmentPhotoArea").style.display = "block";
   document.getElementById("shipmentPhotoPreview").innerText =
-    "出庫送信完了。\n写真を添付する場合は最大6枚まで選んでください。";
+    "出庫送信完了。\n1枚目は出庫伝票推奨。\nカメラで1枚ずつ追加、またはライブラリから最大6枚選択できます。";
+
   document.getElementById("uploadShipmentPhotoBtn").style.display = "none";
-  document.getElementById("shipmentPhotoInput").value = "";
+  document.getElementById("uploadShipmentPhotoBtn").disabled = false;
+  document.getElementById("shipmentCameraInput").value = "";
+  document.getElementById("shipmentLibraryInput").value = "";
 
   log("出庫送信完了。写真添付を選択してください");
 }
 
-function chooseShipmentPhotos() {
-  document.getElementById("shipmentPhotoInput").click();
+function chooseShipmentCamera() {
+  document.getElementById("shipmentCameraInput").click();
 }
 
-function previewShipmentPhotos() {
-  const input = document.getElementById("shipmentPhotoInput");
+function chooseShipmentLibrary() {
+  document.getElementById("shipmentLibraryInput").click();
+}
+
+function addShipmentCameraPhoto() {
+  const input = document.getElementById("shipmentCameraInput");
   const files = Array.from(input.files || []);
 
-  if (files.length === 0) {
-    document.getElementById("shipmentPhotoPreview").innerText = "";
-    document.getElementById("uploadShipmentPhotoBtn").style.display = "none";
+  if (files.length === 0) return;
+
+  addShipmentPhotosToList(files);
+
+  // 同じ撮影ボタンを続けて使えるようにリセット
+  input.value = "";
+}
+
+function addShipmentLibraryPhotos() {
+  const input = document.getElementById("shipmentLibraryInput");
+  const files = Array.from(input.files || []);
+
+  if (files.length === 0) return;
+
+  addShipmentPhotosToList(files);
+
+  // 同じ写真を再選択できるようにリセット
+  input.value = "";
+}
+
+function addShipmentPhotosToList(files) {
+  if (selectedShipmentPhotos.length + files.length > 6) {
+    alert("写真は最大6枚までです。\n現在：" + selectedShipmentPhotos.length + "枚");
     return;
   }
 
-  if (files.length > 6) {
-    alert("写真は最大6枚までです");
-    input.value = "";
-    document.getElementById("shipmentPhotoPreview").innerText = "";
+  files.forEach(function(file) {
+    selectedShipmentPhotos.push(file);
+  });
+
+  updateShipmentPhotoPreview();
+}
+
+function updateShipmentPhotoPreview() {
+  const count = selectedShipmentPhotos.length;
+
+  if (count === 0) {
+    document.getElementById("shipmentPhotoPreview").innerText =
+      "写真はまだ選択されていません。";
     document.getElementById("uploadShipmentPhotoBtn").style.display = "none";
     return;
   }
 
   document.getElementById("shipmentPhotoPreview").innerText =
-    files.length + "枚選択中\n1枚のコラージュ画像にして保存します。";
+    count + "枚追加済み\n最大6枚まで。1枚のコラージュ画像にして保存します。";
 
   document.getElementById("uploadShipmentPhotoBtn").style.display = "block";
 }
 
+function clearShipmentPhotos() {
+  selectedShipmentPhotos = [];
+
+  document.getElementById("shipmentCameraInput").value = "";
+  document.getElementById("shipmentLibraryInput").value = "";
+
+  updateShipmentPhotoPreview();
+}
+
 function skipShipmentPhotos() {
   document.getElementById("shipmentPhotoArea").style.display = "none";
-  document.getElementById("shipmentPhotoInput").value = "";
+  document.getElementById("shipmentCameraInput").value = "";
+  document.getElementById("shipmentLibraryInput").value = "";
   document.getElementById("shipmentPhotoPreview").innerText = "";
   document.getElementById("uploadShipmentPhotoBtn").style.display = "none";
+  document.getElementById("uploadShipmentPhotoBtn").disabled = false;
+
+  selectedShipmentPhotos = [];
   lastShipmentPhotoInfo = null;
 
   log("写真なしで完了しました。続けて読み取る場合は「カメラ起動」を押してください");
 }
 
 async function uploadShipmentPhotos() {
-  const input = document.getElementById("shipmentPhotoInput");
-  const files = Array.from(input.files || []);
+  const files = selectedShipmentPhotos.slice();
 
   if (!lastShipmentPhotoInfo) {
     alert("出庫情報がありません");
@@ -850,7 +912,7 @@ async function uploadShipmentPhotos() {
   }
 
   if (files.length === 0) {
-    alert("写真が選択されていません");
+    alert("写真を選択してください");
     return;
   }
 
@@ -868,16 +930,14 @@ async function uploadShipmentPhotos() {
 
     log("出庫写真を保存中...");
 
-    const data = {
-      action: "saveShipmentPhoto",
-      photoBase64: collageBase64,
-      photoInfo: lastShipmentPhotoInfo
-    };
-
     const result = await fetch(GAS_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain" },
-      body: JSON.stringify(data)
+      body: JSON.stringify({
+        action: "saveShipmentPhoto",
+        photoBase64: collageBase64,
+        photoInfo: lastShipmentPhotoInfo
+      })
     }).then(function(response) {
       return response.json();
     });
@@ -892,10 +952,13 @@ async function uploadShipmentPhotos() {
     alert("出庫写真を保存しました");
 
     document.getElementById("shipmentPhotoArea").style.display = "none";
-    input.value = "";
+    document.getElementById("shipmentCameraInput").value = "";
+    document.getElementById("shipmentLibraryInput").value = "";
     document.getElementById("shipmentPhotoPreview").innerText = "";
     btn.style.display = "none";
     btn.disabled = false;
+
+    selectedShipmentPhotos = [];
     lastShipmentPhotoInfo = null;
 
     log("写真保存完了。続けて読み取る場合は「カメラ起動」を押してください");
@@ -932,17 +995,17 @@ function makeShipmentCollage(files, info) {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.fillStyle = "#000000";
-    ctx.font = "32px sans-serif";
-    ctx.fillText("出庫写真", 20, 42);
+    ctx.font = "38px sans-serif";
+    ctx.fillText("出庫写真", 20, 48);
 
-    ctx.font = "22px sans-serif";
-    ctx.fillText("日時：" + new Date().toLocaleString("ja-JP"), 20, 76);
-    ctx.fillText("担当：" + (info.user || ""), 20, 104);
+    ctx.font = "28px sans-serif";
+    ctx.fillText("日時：" + new Date().toLocaleString("ja-JP"), 20, 88);
+    ctx.fillText("担当：" + (info.user || ""), 20, 128);
 
     const idText = (info.ids || []).join(" ");
-    ctx.fillText("QR：" + idText.slice(0, 80), 360, 76);
-    if (idText.length > 80) {
-      ctx.fillText(idText.slice(80, 160), 360, 104);
+    ctx.fillText("QR：" + idText.slice(0, 78), 520, 88);
+    if (idText.length > 78) {
+      ctx.fillText(idText.slice(78, 156), 520, 128);
     }
 
     for (let i = 0; i < 6; i++) {
@@ -960,10 +1023,10 @@ function makeShipmentCollage(files, info) {
       }
 
       ctx.fillStyle = "rgba(0,0,0,0.65)";
-      ctx.fillRect(x + 8, y + 8, 72, 34);
+      ctx.fillRect(x + 10, y + 10, 92, 44);
       ctx.fillStyle = "#ffffff";
-      ctx.font = "22px sans-serif";
-      ctx.fillText((i + 1) + "枚目", x + 14, y + 32);
+      ctx.font = "30px sans-serif";
+      ctx.fillText((i + 1) + "枚目", x + 18, y + 42);
     }
 
     resolve(canvas.toDataURL("image/jpeg", 0.92));

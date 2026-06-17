@@ -1,1 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QR / Data Matrix テスト</title>
 
+<script src="https://unpkg.com/@zxing/browser@latest"></script>
+
+<style>
+body {
+  font-family: sans-serif;
+  font-size: 22px;
+  padding: 20px;
+}
+
+button {
+  font-size: 24px;
+  padding: 14px;
+  width: 100%;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+}
+
+#status {
+  color: blue;
+  font-weight: bold;
+  white-space: pre-wrap;
+  margin: 10px 0;
+}
+
+#lastRead {
+  color: green;
+  font-size: 24px;
+  font-weight: bold;
+  white-space: pre-wrap;
+  margin: 10px 0;
+}
+
+#video {
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  background: #000;
+}
+
+#count {
+  font-size: 20px;
+  font-weight: bold;
+  margin: 12px 0 4px;
+}
+
+#scanList {
+  font-size: 26px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+</style>
+</head>
+
+<body>
+<h2>QR / Data Matrix 読取テスト</h2>
+
+<button onclick="startScan()">カメラ起動</button>
+<button onclick="stopScan()">停止</button>
+<button onclick="resetScan()">リセット</button>
+
+<div id="status">未起動</div>
+<div id="lastRead"></div>
+
+<video id="video" playsinline></video>
+
+<div id="count">読取件数：0件</div>
+<div id="scanList"></div>
+
+<script>
+let codeReader = null;
+let controls = null;
+let scannedSet = new Set();
+
+function log(msg) {
+  document.getElementById("status").innerText = msg;
+}
+
+function refreshDisplay(text) {
+  document.getElementById("lastRead").innerText =
+    "読取成功 ✔\n" + text;
+
+  document.getElementById("count").innerText =
+    "読取件数：" + scannedSet.size + "件";
+
+  document.getElementById("scanList").innerHTML =
+    Array.from(scannedSet).reverse().map(function(item) {
+      return "<div>" + item + "</div>";
+    }).join("");
+}
+
+async function startScan() {
+  try {
+    log("カメラ起動中...");
+
+    const hints = new Map();
+
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+      ZXing.BarcodeFormat.QR_CODE,
+      ZXing.BarcodeFormat.DATA_MATRIX
+    ]);
+
+    codeReader = new ZXingBrowser.BrowserMultiFormatReader(hints);
+
+    const video = document.getElementById("video");
+
+    controls = await codeReader.decodeFromConstraints(
+      {
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        },
+        audio: false
+      },
+      video,
+      function(result, err) {
+        if (result) {
+          const text = result.getText();
+
+          if (!scannedSet.has(text)) {
+            scannedSet.add(text);
+            refreshDisplay(text);
+
+            if (navigator.vibrate) {
+              navigator.vibrate(100);
+            }
+
+            log("読取中：QR / Data Matrix 対応");
+          }
+        }
+      }
+    );
+
+    log("カメラ起動成功");
+
+  } catch (err) {
+    log("カメラ起動失敗\n" + err);
+  }
+}
+
+function stopScan() {
+  if (controls) {
+    controls.stop();
+    controls = null;
+  }
+
+  log("停止しました");
+}
+
+function resetScan() {
+  scannedSet.clear();
+
+  document.getElementById("lastRead").innerText = "";
+  document.getElementById("count").innerText = "読取件数：0件";
+  document.getElementById("scanList").innerHTML = "";
+
+  log("リセットしました");
+}
+</script>
+</body>
+</html>

@@ -439,7 +439,7 @@ async function startQr() {
     // カメラ起動直後はvideo.srcObjectがまだ入らない場合があるため少し待つ
     setTimeout(applyCameraZoomOnly, 800);
 
-   log("カメラ起動成功\nQR / Data Matrix 対応\nズーム1.8倍・ライトなし");
+   log("カメラ起動成功\nQR / Data Matrix 対応\nズーム1.9倍・ライトなし");
 
   } catch(err) {
     
@@ -471,7 +471,7 @@ async function applyCameraZoomOnly() {
     // ライトは透明テープ・収縮チューブで反射しやすいので使わない
     if (caps.zoom) {
       await track.applyConstraints({
-        advanced: [{ zoom: Math.min(1.8, caps.zoom.max) }]
+        advanced: [{ zoom: Math.min(1.9, caps.zoom.max) }]
       });
     }
     try {

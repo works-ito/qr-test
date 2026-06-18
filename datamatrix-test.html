@@ -439,13 +439,12 @@ async function startQr() {
     // カメラ起動直後はvideo.srcObjectがまだ入らない場合があるため少し待つ
     setTimeout(applyCameraZoomOnly, 800);
 
-    log("カメラ起動成功
-QR / Data Matrix 対応
-ズーム2倍・ライトなし");
+   log("カメラ起動成功\nQR / Data Matrix 対応\nズーム2倍・ライトなし");
 
   } catch(err) {
-    log("カメラ起動失敗
-" + err);
+    
+  log("カメラ起動失敗\n" + err);
+    
     scanning = false;
 
     if (codeReader) {

@@ -474,6 +474,15 @@ async function applyCameraZoomOnly() {
         advanced: [{ zoom: Math.min(3.0, caps.zoom.max) }]
       });
     }
+    try {
+  await track.applyConstraints({
+    advanced: [{
+      focusMode: "continuous"
+    }]
+  });
+} catch(e) {
+  console.log("focusMode未対応", e);
+}
   } catch(e) {
     console.log("zoom設定未対応", e);
   }

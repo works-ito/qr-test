@@ -471,7 +471,7 @@ async function applyCameraZoomOnly() {
     // ライトは透明テープ・収縮チューブで反射しやすいので使わない
     if (caps.zoom) {
       await track.applyConstraints({
-        advanced: [{ zoom: Math.min(2.5, caps.zoom.max) }]
+        advanced: [{ zoom: Math.min(2.3, caps.zoom.max) }]
       });
     }
   } catch(e) {

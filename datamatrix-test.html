@@ -366,6 +366,14 @@ async function startQr() {
 
 scanning = true;
 
+    document.getElementById("startBtn").style.display = "none";
+document.getElementById("stopBtn").style.display = "block";
+document.getElementById("resetBtn").style.display = "block";
+
+setTimeout(applyCameraZoomOnly, 800);
+
+log("カメラ起動成功\nQR / Data Matrix 対応\nズーム1.8倍・ライトなし");
+    
   } catch(err) {
     log("カメラ起動失敗\n" + err);
 

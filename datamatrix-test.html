@@ -354,30 +354,17 @@ async function startQr() {
       ? backCamera.deviceId
       : devices[devices.length - 1].deviceId;
 
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
-        facingMode: "environment"
-      },
-      audio: false
-    });
+   codeReader.decodeFromVideoDevice(
+  selectedDeviceId,
+  "video",
+  function(result, err) {
+    if (result) {
+      handleDecoded(result.getText());
+    }
+  }
+);
 
-    const video = document.getElementById("video");
-    video.srcObject = stream;
-    await video.play();
-
-    scanning = true;
-    scanBusy = false;
-
-    document.getElementById("startBtn").style.display = "none";
-    document.getElementById("stopBtn").style.display = "block";
-    document.getElementById("resetBtn").style.display = "block";
-
-    setTimeout(applyCameraZoomOnly, 800);
-
-    log("カメラ起動成功\n中央切り出し読取モード\nQR / Data Matrix 対応\nズーム1.8倍・ライトなし");
-
-    scanLoop();
+scanning = true;
 
   } catch(err) {
     log("カメラ起動失敗\n" + err);
@@ -432,56 +419,7 @@ async function applyCameraZoomOnly() {
 }
 
 function scanLoop() {
-  if (!scanning || scanBusy || !codeReader) {
-    if (scanning) {
-      setTimeout(scanLoop, SCAN_INTERVAL);
-    }
-    return;
-  }
-
-  const video = document.getElementById("video");
-  const canvas = document.getElementById("canvas");
-
-  if (!video.videoWidth || !video.videoHeight) {
-    setTimeout(scanLoop, SCAN_INTERVAL);
-    return;
-  }
-
-  scanBusy = true;
-
-  const vw = video.videoWidth;
-  const vh = video.videoHeight;
-
-  const cropSize = Math.floor(Math.min(vw, vh) * CROP_RATIO);
-  const sx = Math.floor((vw - cropSize) / 2);
-  const sy = Math.floor((vh - cropSize) / 2);
-
-  canvas.width = cropSize;
-  canvas.height = cropSize;
-
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-
-  ctx.drawImage(
-    video,
-    sx, sy, cropSize, cropSize,
-    0, 0, cropSize, cropSize
-  );
-
-  try {
-    const result = codeReader.decodeFromCanvas(canvas);
-
-    if (result) {
-      handleDecoded(result.getText());
-    }
-  } catch(e) {
-    // 読めない瞬間は普通なので無視
-  }
-
-  scanBusy = false;
-
-  if (scanning) {
-    setTimeout(scanLoop, SCAN_INTERVAL);
-  }
+  // ZXing版ではdecodeFromVideoDeviceが連続読取するため、この関数は使わない
 }
 
 function isValidQrText(text) {

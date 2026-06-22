@@ -74,13 +74,15 @@ button, select, input {
 .readItem { margin-bottom:4px; }
 canvas { display:none; }
 
-#memoArea, #returnCaseArea, #shipmentPhotoArea {
+#memoArea, #returnCaseArea, #shipmentPhotoArea, #recDateBox {
   display:none;
   margin-top:20px;
   padding:12px;
   border:2px solid #333;
 }
 #memoArea { background:#fffbe6; }
+#recDateBox { background:#fffbe6; border:2px solid #333; padding:12px; margin-top:8px; }
+#recDateBox label { font-weight:bold; display:block; margin-bottom:8px; }
 #returnCaseArea { background:#eef; }
 #shipmentPhotoArea { background:#eefaf0; }
 #shipmentPhotoArea p {
@@ -142,7 +144,12 @@ textarea {
     <option value="振動計">振動計</option>
     <option value="内部USB">内部USB</option>
   </select>
-</div> 
+</div>
+
+<div id="recDateBox" style="display:none;">
+  <label id="recDateLabel" for="recDate">校正実施日</label>
+  <input type="date" id="recDate">
+</div>
   
 <button id="startBtn" onclick="startQr()">カメラ起動</button>
 <button id="stopBtn" onclick="stopQr()" style="display:none;">停止</button>
@@ -243,6 +250,57 @@ function log(msg) {
   document.getElementById("status").innerText = msg;
 }
 
+function formatDateYYYYMMDD(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return y + "-" + m + "-" + d;
+}
+
+function shouldRequireRecDate() {
+  const mode = document.getElementById("mode").value;
+  return ["校正完了", "交換完了"].includes(mode);
+}
+
+function getRecDateLabelText() {
+  const mode = document.getElementById("mode").value;
+  return mode === "交換完了" ? "交換実施日" : "校正実施日";
+}
+
+function ensureRecDateDefault() {
+  const recDate = document.getElementById("recDate");
+  if (!recDate.value) {
+    recDate.value = formatDateYYYYMMDD(new Date());
+  }
+}
+
+function validateRecDateBeforeSend() {
+  if (!shouldRequireRecDate()) return true;
+
+  const recDate = document.getElementById("recDate").value;
+  const label = getRecDateLabelText();
+
+  if (!recDate) {
+    alert(label + "を入力してください");
+    scrollToElement("recDateBox");
+    return false;
+  }
+
+  return true;
+}
+
+function buildBaseSendData(qrText) {
+  const data = buildBaseSendData(qrText);
+
+  if (shouldRequireRecDate()) {
+    data.recDate = document.getElementById("recDate").value;
+    data.calibrationDate = document.getElementById("recDate").value;
+    data.dateLabel = getRecDateLabelText();
+  }
+
+  return data;
+}
+
 function flashScanFrame() {
   const frame = document.getElementById("scanFrame");
   if (!frame) return;
@@ -313,13 +371,26 @@ function loadSelections() {
   if (!["騒音計", "振動計", "内部USB"].includes(document.getElementById("recTarget").value)) {
     document.getElementById("recTarget").value = "騒音計";
   }
+
+  ensureRecDateDefault();
 }
 
 function toggleRecTarget() {
   const mode = document.getElementById("mode").value;
   const recModes = ["校正中", "校正完了", "交換完了"];
+  const dateModes = ["校正完了", "交換完了"];
+
   document.getElementById("recTargetBox").style.display =
     recModes.includes(mode) ? "block" : "none";
+
+  document.getElementById("recDateBox").style.display =
+    dateModes.includes(mode) ? "block" : "none";
+
+  document.getElementById("recDateLabel").innerText = getRecDateLabelText();
+
+  if (dateModes.includes(mode)) {
+    ensureRecDateDefault();
+  }
 }
 
 function playBeep(type) {
@@ -494,6 +565,11 @@ function handleDecoded(decodedText) {
 
   if (scannedSet.has(decodedText)) return;
 
+  if (!validateRecDateBeforeSend()) {
+    log("日付未入力のため送信を止めました");
+    return;
+  }
+
   scannedSet.add(decodedText);
   lastScanned = decodedText;
 
@@ -627,6 +703,10 @@ async function sendBatchToSheet() {
   }
 
   const mode = document.getElementById("mode").value;
+
+  if (!validateRecDateBeforeSend()) {
+    return;
+  }
 
   if (mode === "返却") {
     showReturnCaseArea(items);
@@ -765,13 +845,7 @@ async function sendReturnBatchAfterMemo() {
 }
 
 function sendFastItem(qrText, extraData) {
-  const data = {
-    mode: document.getElementById("mode").value,
-    qr: qrText,
-    user: document.getElementById("user").value,
-    location: document.getElementById("location").value,
-    recTarget: document.getElementById("recTarget").value
-  };
+  const data = buildBaseSendData(qrText);
 
   if (extraData) {
     Object.assign(data, extraData);
@@ -1069,13 +1143,7 @@ function sendToSheet(qrText) {
   document.querySelector("#memoArea button").disabled = true;
   document.getElementById("memoArea").style.display = "block";
 
-  const data = {
-    mode: document.getElementById("mode").value,
-    qr: qrText,
-    user: document.getElementById("user").value,
-    location: document.getElementById("location").value,
-    recTarget: document.getElementById("recTarget").value
-  };
+  const data = buildBaseSendData(qrText);
 
   fetch(GAS_URL, {
     method: "POST",

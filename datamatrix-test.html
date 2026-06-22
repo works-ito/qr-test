@@ -17,6 +17,15 @@ button, select, input {
   color:green; font-size:18px; font-weight:bold;
   margin:5px 0; min-height:26px; white-space:nowrap;
 }
+#topSelectors {
+  display:flex;
+  gap:6px;
+}
+
+#topSelectors select {
+  flex:1;
+  min-width:0;
+}  
 #cameraBox {
   position: relative;
   width: 100%;
@@ -97,6 +106,7 @@ textarea {
 <body>
 <h2>QR / Data Matrix 連続読取</h2>
 
+<div id="topSelectors">
 <select id="mode" onchange="toggleRecTarget()">
   <option value="出庫">出庫</option>
   <option value="返却">返却</option>
@@ -108,20 +118,12 @@ textarea {
   <option value="交換完了">交換完了</option>
 </select>
 
-<div id="recTargetBox" style="display:none;">
-  <select id="recTarget">
-    <option value="騒音計">騒音計</option>
-    <option value="振動計">振動計</option>
-    <option value="内部USB">内部USB</option>
-  </select>
-</div>
-
 <select id="location">
   <option value="本社">本社</option>
   <option value="三郷">三郷</option>
-  <option value="メインファクトリー">メインファクトリー</option>
+  <option value="MF">MF</option>
 </select>
-
+  
 <select id="user">
   <option value="" selected>担当者選択</option>
   <option value="奥">奥</option>
@@ -132,7 +134,16 @@ textarea {
   <option value="篠塚">篠塚</option>
   <option value="その他">その他</option>
 </select>
+</div>
 
+  <div id="recTargetBox" style="display:none;">
+  <select id="recTarget">
+    <option value="騒音計">騒音計</option>
+    <option value="振動計">振動計</option>
+    <option value="内部USB">内部USB</option>
+  </select>
+</div> 
+  
 <button id="startBtn" onclick="startQr()">カメラ起動</button>
 <button id="stopBtn" onclick="stopQr()" style="display:none;">停止</button>
 <button id="resetBtn" onclick="resetScan()" style="display:none;">読取リセット</button>

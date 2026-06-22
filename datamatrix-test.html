@@ -241,6 +241,18 @@ function flashScanFrame() {
   }, 180);
 }
 
+function scrollToElement(id) {
+  setTimeout(function() {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    el.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+  }, 300);
+}
+  
 function startBatchLoading(message) {
   stopBatchLoading();
   batchLoadingDots = 0;
@@ -665,6 +677,7 @@ function showReturnCaseArea(items) {
   document.getElementById("sendBatchBtn").disabled = true;
 
   log("返却追記を選択してください");
+  scrollToElement("returnCaseArea");
 }
 
 async function sendReturnBatchAfterMemo() {
@@ -781,6 +794,7 @@ function showShipmentPhotoArea(items) {
   document.getElementById("shipmentLibraryInput").value = "";
 
   log("出庫送信完了。写真添付を選択してください");
+  scrollToElement("shipmentPhotoArea");
 }
 
 function chooseShipmentCamera() {

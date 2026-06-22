@@ -290,11 +290,18 @@ function validateRecDateBeforeSend() {
 }
 
 function buildBaseSendData(qrText) {
-  const data = buildBaseSendData(qrText);
+  const data = {
+    mode: document.getElementById("mode").value,
+    qr: qrText,
+    user: document.getElementById("user").value,
+    location: document.getElementById("location").value,
+    recTarget: document.getElementById("recTarget").value
+  };
 
   if (shouldRequireRecDate()) {
-    data.recDate = document.getElementById("recDate").value;
-    data.calibrationDate = document.getElementById("recDate").value;
+    const recDate = document.getElementById("recDate").value;
+    data.recDate = recDate;
+    data.calibrationDate = recDate;
     data.dateLabel = getRecDateLabelText();
   }
 

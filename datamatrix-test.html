@@ -83,6 +83,11 @@ canvas { display:none; }
 #memoArea { background:#fffbe6; }
 #recDateBox { background:#fffbe6; border:2px solid #333; padding:12px; margin-top:8px; }
 #recDateBox label { font-weight:bold; display:block; margin-bottom:8px; }
+#recDateBox input {
+  width:100%;
+  max-width:100%;
+  box-sizing:border-box;
+}
 #returnCaseArea { background:#eef; }
 #shipmentPhotoArea { background:#eefaf0; }
 #shipmentPhotoArea p {
@@ -562,6 +567,17 @@ function refreshScanDisplay(decodedText) {
     }).join("");
 }
 
+function makeScanKey(qrText) {
+  const mode = document.getElementById("mode").value;
+  const recTarget = document.getElementById("recTarget").value;
+
+  if (["校正中", "校正完了", "交換完了"].includes(mode)) {
+    return qrText + "__" + mode + "__" + recTarget;
+  }
+
+  return qrText;
+}  
+
 function handleDecoded(decodedText) {
   decodedText = String(decodedText).trim();
 
@@ -570,15 +586,17 @@ function handleDecoded(decodedText) {
     return;
   }
 
-  if (scannedSet.has(decodedText)) return;
+  const scanKey = makeScanKey(decodedText);
+
+  if (scannedSet.has(scanKey)) return;
 
   if (!validateRecDateBeforeSend()) {
     log("日付未入力のため送信を止めました");
     return;
   }
 
-  scannedSet.add(decodedText);
-  lastScanned = decodedText;
+  scannedSet.add(scanKey);
+  lastScanned = scanKey;
 
   document.getElementById("undoBtn").style.display = "block";
   refreshScanDisplay(decodedText);
@@ -599,7 +617,7 @@ function handleDecoded(decodedText) {
   sendToSheet(decodedText);
   stopQr();
 }
-
+  
 function stopQr() {
   if (!scanning) {
     log("まだ起動していません");

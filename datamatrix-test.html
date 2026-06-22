@@ -370,6 +370,13 @@ scanning = true;
 document.getElementById("stopBtn").style.display = "block";
 document.getElementById("resetBtn").style.display = "block";
 
+  setTimeout(function() {
+  document.getElementById("cameraBox").scrollIntoView({
+    behavior: "smooth",
+    block: "start"
+  });
+}, 300);
+    
 setTimeout(applyCameraZoomOnly, 800);
 
 log("カメラ起動成功\nQR / Data Matrix 対応\nズーム1.8倍・ライトなし");

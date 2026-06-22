@@ -15,7 +15,7 @@ button, select, input {
 select {
   font-size:18px;
 }
-#status { color:blue;  font-size:16px; font-weight:bold; white-space:pre-wrap; margin:10px 0; }
+#status { color:blue; font-size:16px; font-weight:bold; white-space:pre-wrap; margin:10px 0; }
 #lastRead {
   color:green; font-size:18px; font-weight:bold;
   margin:5px 0; min-height:26px; white-space:nowrap;
@@ -24,11 +24,10 @@ select {
   display:flex;
   gap:6px;
 }
-
 #topSelectors select {
   flex:1;
   min-width:0;
-}  
+}
 #cameraBox {
   position: relative;
   width: 100%;
@@ -73,7 +72,7 @@ select {
   100% { border-color:#ffffff; filter:none; }
 }
 #count { font-size:20px; font-weight:bold; margin:8px 0 4px; }
-#scanList { font-size:28px; line-height:1.5; margin-top:8px; white-space:pre-wrap; }
+#scanList { font-size:24px; line-height:1.5; margin-top:8px; white-space:pre-wrap; }
 .readItem { margin-bottom:4px; }
 canvas { display:none; }
 
@@ -84,7 +83,7 @@ canvas { display:none; }
   border:2px solid #333;
 }
 #memoArea { background:#fffbe6; }
-#recDateBox { background:#fffbe6; border:2px solid #333; padding:12px; margin-top:8px; }
+#recDateBox { background:#fffbe6; border:2px solid #333; padding:12px; margin-top:8px; overflow:hidden; }
 #recDateBox label { font-weight:bold; display:block; margin-bottom:8px; }
 #recDateBox input {
   width:100%;
@@ -99,16 +98,12 @@ canvas { display:none; }
   min-width:0;
   box-sizing:border-box;
   padding:8px;
-  color: #000;
-  font-size: 24px;
-  font-weight: bold;
-  text-align: center;
+  color:#000;
+  font-size:24px;
+  font-weight:bold;
+  text-align:center;
   -webkit-appearance:none;
   appearance:none;
-}
-
-#recDateBox {
-  overflow:hidden;
 }
 #returnCaseArea { background:#eef; }
 #shipmentPhotoArea { background:#eefaf0; }
@@ -161,7 +156,7 @@ textarea {
   <option value="三郷">三郷</option>
   <option value="MF">MF</option>
 </select>
-  
+
 <select id="user">
   <option value="" selected>担当者選択</option>
   <option value="奥">奥</option>
@@ -174,7 +169,7 @@ textarea {
 </select>
 </div>
 
-  <div id="recTargetBox" style="display:none;">
+<div id="recTargetBox" style="display:none;">
   <select id="recTarget">
     <option value="騒音計">騒音計</option>
     <option value="振動計">振動計</option>
@@ -186,7 +181,7 @@ textarea {
   <label id="recDateLabel" for="recDate">校正実施日</label>
   <input type="date" id="recDate">
 </div>
-  
+
 <button id="startBtn" onclick="startQr()">カメラ起動</button>
 <button id="stopBtn" onclick="stopQr()" style="display:none;">停止</button>
 <button id="resetBtn" onclick="resetScan()" style="display:none;">読取リセット</button>
@@ -220,10 +215,8 @@ textarea {
 
 <div id="returnCaseArea">
   <div style="font-weight:bold; margin-bottom:10px;">返却案件の追記</div>
-
   <label><input type="radio" name="returnMemoType" value="なし">追記なし</label><br>
   <label><input type="radio" name="returnMemoType" value="あり">追記あり</label>
-
   <textarea id="returnCaseMemo" placeholder="燃料不足・付属品不足・伝票写真あり等" style="display:none;"></textarea>
   <button onclick="sendReturnBatchAfterMemo()">返却をまとめて送信</button>
 </div>
@@ -231,21 +224,14 @@ textarea {
 <div id="shipmentPhotoArea">
   <div style="font-weight:bold; margin-bottom:10px;">出庫写真の添付</div>
   <p>1枚目は出庫伝票の撮影推奨。最大6枚まで。</p>
-
   <button onclick="skipShipmentPhotos()">写真なしで完了</button>
-
   <input type="file" id="shipmentCameraInput" accept="image/*" capture="environment" style="display:none;" onchange="addShipmentCameraPhoto()">
   <input type="file" id="shipmentLibraryInput" accept="image/*" multiple style="display:none;" onchange="addShipmentLibraryPhotos()">
-
   <button onclick="chooseShipmentCamera()">カメラで1枚ずつ追加</button>
   <button onclick="chooseShipmentLibrary()">ライブラリから選ぶ</button>
   <button onclick="clearShipmentPhotos()">選択写真をクリア</button>
-
   <div id="shipmentPhotoPreview"></div>
-
-  <button id="uploadShipmentPhotoBtn" onclick="uploadShipmentPhotos()" style="display:none;">
-    写真を保存
-  </button>
+  <button id="uploadShipmentPhotoBtn" onclick="uploadShipmentPhotos()" style="display:none;">写真を保存</button>
 </div>
 
 <script>
@@ -258,7 +244,9 @@ let scanning = false;
 let scanBusy = false;
 
 let scannedSet = new Set();
+let scannedRecords = [];
 let lastScanned = "";
+let lastScannedRecord = null;
 let lastItemForMemo = null;
 
 let loadingTimer = null;
@@ -277,9 +265,14 @@ let selectedShipmentPhotos = [];
 const SCAN_INTERVAL = 120;
 const CROP_RATIO = 0.55;
 const FAST_MODES = ["出庫", "完成機", "返却", "修理中"];
+const REC_MODES = ["校正中", "校正完了", "交換完了"];
 
 function isFastMode() {
   return FAST_MODES.includes(document.getElementById("mode").value);
+}
+
+function isRecMode() {
+  return REC_MODES.includes(document.getElementById("mode").value);
 }
 
 function log(msg) {
@@ -305,9 +298,7 @@ function getRecDateLabelText() {
 
 function ensureRecDateDefault() {
   const recDate = document.getElementById("recDate");
-  if (!recDate.value) {
-    recDate.value = formatDateYYYYMMDD(new Date());
-  }
+  if (!recDate.value) recDate.value = formatDateYYYYMMDD(new Date());
 }
 
 function validateRecDateBeforeSend() {
@@ -321,7 +312,6 @@ function validateRecDateBeforeSend() {
     scrollToElement("recDateBox");
     return false;
   }
-
   return true;
 }
 
@@ -340,31 +330,66 @@ function buildBaseSendData(qrText) {
     data.calibrationDate = recDate;
     data.dateLabel = getRecDateLabelText();
   }
-
   return data;
+}
+
+function makeScanKey(qrText) {
+  const mode = document.getElementById("mode").value;
+  const recTarget = document.getElementById("recTarget").value;
+
+  if (REC_MODES.includes(mode)) {
+    return qrText + "__" + mode + "__" + recTarget;
+  }
+  return qrText;
+}
+
+function makeScanRecord(qrText) {
+  const mode = document.getElementById("mode").value;
+  const recTarget = document.getElementById("recTarget").value;
+  const key = makeScanKey(qrText);
+  const isRec = REC_MODES.includes(mode);
+
+  return {
+    key: key,
+    qrText: qrText,
+    mode: mode,
+    user: document.getElementById("user").value,
+    location: document.getElementById("location").value,
+    recTarget: recTarget,
+    displayText: isRec ? (qrText + " / " + recTarget) : qrText
+  };
+}
+
+function updateScanDisplay(lastMessage) {
+  document.getElementById("count").innerText = "読取件数：" + scannedRecords.length + "件";
+  document.getElementById("scanList").innerHTML = scannedRecords.slice().reverse().map(function(record) {
+    return '<div class="readItem">' + record.displayText + '</div>';
+  }).join("");
+
+  if (lastMessage !== undefined) {
+    document.getElementById("lastRead").innerText = lastMessage;
+  }
+}
+
+function refreshScanDisplay(decodedText) {
+  updateScanDisplay("読取成功 ✔ " + decodedText);
 }
 
 function flashScanFrame() {
   const frame = document.getElementById("scanFrame");
   if (!frame) return;
   frame.classList.add("flash");
-  setTimeout(function() {
-    frame.classList.remove("flash");
-  }, 180);
+  setTimeout(function() { frame.classList.remove("flash"); }, 180);
 }
 
 function scrollToElement(id) {
   setTimeout(function() {
     const el = document.getElementById(id);
     if (!el) return;
-
-    el.scrollIntoView({
-      behavior: "smooth",
-      block: "start"
-    });
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
   }, 300);
 }
-  
+
 function startBatchLoading(message) {
   stopBatchLoading();
   batchLoadingDots = 0;
@@ -414,7 +439,6 @@ function loadSelections() {
   if (!["騒音計", "振動計", "内部USB"].includes(document.getElementById("recTarget").value)) {
     document.getElementById("recTarget").value = "騒音計";
   }
-
   ensureRecDateDefault();
 }
 
@@ -423,17 +447,11 @@ function toggleRecTarget() {
   const recModes = ["校正中", "校正完了", "交換完了"];
   const dateModes = ["校正完了", "交換完了"];
 
-  document.getElementById("recTargetBox").style.display =
-    recModes.includes(mode) ? "block" : "none";
-
-  document.getElementById("recDateBox").style.display =
-    dateModes.includes(mode) ? "block" : "none";
-
+  document.getElementById("recTargetBox").style.display = recModes.includes(mode) ? "block" : "none";
+  document.getElementById("recDateBox").style.display = dateModes.includes(mode) ? "block" : "none";
   document.getElementById("recDateLabel").innerText = getRecDateLabelText();
 
-  if (dateModes.includes(mode)) {
-    ensureRecDateDefault();
-  }
+  if (dateModes.includes(mode)) ensureRecDateDefault();
 }
 
 function playBeep(type) {
@@ -442,13 +460,10 @@ function playBeep(type) {
     const ctx = new AudioContext();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-
     osc.connect(gain);
     gain.connect(ctx.destination);
-
     osc.frequency.value = type === "success" ? 1600 : 220;
     gain.gain.value = 0.8;
-
     osc.start();
     osc.stop(ctx.currentTime + 0.3);
   } catch(e) {
@@ -472,64 +487,43 @@ async function startQr() {
     ]);
 
     codeReader = new ZXing.BrowserMultiFormatReader(hints);
-
     const devices = await codeReader.listVideoInputDevices();
 
-    if (!devices || devices.length === 0) {
-      throw new Error("カメラが見つかりません");
-    }
+    if (!devices || devices.length === 0) throw new Error("カメラが見つかりません");
 
     const backCamera = devices.find(function(device) {
       const label = (device.label || "").toLowerCase();
-      return label.includes("back") ||
-             label.includes("rear") ||
-             label.includes("environment") ||
-             label.includes("背面");
+      return label.includes("back") || label.includes("rear") || label.includes("environment") || label.includes("背面");
     });
 
-    selectedDeviceId = backCamera
-      ? backCamera.deviceId
-      : devices[devices.length - 1].deviceId;
+    selectedDeviceId = backCamera ? backCamera.deviceId : devices[devices.length - 1].deviceId;
 
-   codeReader.decodeFromVideoDevice(
-  selectedDeviceId,
-  "video",
-  function(result, err) {
-    if (result) {
-      handleDecoded(result.getText());
-    }
-  }
-);
+    codeReader.decodeFromVideoDevice(selectedDeviceId, "video", function(result, err) {
+      if (result) handleDecoded(result.getText());
+    });
 
-scanning = true;
-
+    scanning = true;
     document.getElementById("startBtn").style.display = "none";
-document.getElementById("stopBtn").style.display = "block";
-document.getElementById("resetBtn").style.display = "block";
+    document.getElementById("stopBtn").style.display = "block";
+    document.getElementById("resetBtn").style.display = "block";
 
-  setTimeout(function() {
-  document.getElementById("cameraBox").scrollIntoView({
-    behavior: "smooth",
-    block: "start"
-  });
-}, 300);
-    
-setTimeout(applyCameraZoomOnly, 500);
-setTimeout(applyCameraZoomOnly, 1200);
-setTimeout(applyCameraZoomOnly, 2000);
+    setTimeout(function() {
+      document.getElementById("cameraBox").scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 300);
 
-log("カメラ起動成功\nQR / Data Matrix 対応\nズーム1.8倍・ライトなし");
-    
+    setTimeout(applyCameraZoomOnly, 500);
+    setTimeout(applyCameraZoomOnly, 1200);
+    setTimeout(applyCameraZoomOnly, 2000);
+
+    log("カメラ起動成功\nQR / Data Matrix 対応\nズーム1.8倍・ライトなし");
+
   } catch(err) {
     log("カメラ起動失敗\n" + err);
-
     scanning = false;
     scanBusy = false;
 
     if (stream) {
-      stream.getTracks().forEach(function(track) {
-        track.stop();
-      });
+      stream.getTracks().forEach(function(track) { track.stop(); });
       stream = null;
     }
 
@@ -545,28 +539,18 @@ async function applyCameraZoomOnly() {
     const video = document.getElementById("video");
     const s = video.srcObject;
     if (!s) return;
-
     stream = s;
-
     const track = s.getVideoTracks()[0];
     if (!track) return;
-
     const caps = track.getCapabilities ? track.getCapabilities() : {};
-
     if (caps.zoom) {
-      await track.applyConstraints({
-        advanced: [{ zoom: Math.min(1.8, caps.zoom.max) }]
-      });
+      await track.applyConstraints({ advanced: [{ zoom: Math.min(1.8, caps.zoom.max) }] });
     }
-
     try {
-      await track.applyConstraints({
-        advanced: [{ focusMode: "continuous" }]
-      });
+      await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
     } catch(e) {
       console.log("focusMode未対応", e);
     }
-
   } catch(e) {
     console.log("zoom設定未対応", e);
   }
@@ -578,36 +562,10 @@ function scanLoop() {
 
 function isValidQrText(text) {
   text = String(text).trim();
-
   if (text.includes("entry.") && text.includes("=")) return true;
   if (/^[A-Z0-9]{2,10}-[A-Z0-9]{1,10}$/.test(text)) return true;
-
   return false;
 }
-
-function refreshScanDisplay(decodedText) {
-  document.getElementById("lastRead").innerText =
-    "読取成功 ✔ " + decodedText;
-
-  document.getElementById("count").innerText =
-    "読取件数：" + scannedSet.size + "件";
-
-  document.getElementById("scanList").innerHTML =
-    Array.from(scannedSet).reverse().map(function(item) {
-      return '<div class="readItem">' + item + '</div>';
-    }).join("");
-}
-
-function makeScanKey(qrText) {
-  const mode = document.getElementById("mode").value;
-  const recTarget = document.getElementById("recTarget").value;
-
-  if (["校正中", "校正完了", "交換完了"].includes(mode)) {
-    return qrText + "__" + mode + "__" + recTarget;
-  }
-
-  return qrText;
-}  
 
 function handleDecoded(decodedText) {
   decodedText = String(decodedText).trim();
@@ -617,30 +575,30 @@ function handleDecoded(decodedText) {
     return;
   }
 
-  const scanKey = makeScanKey(decodedText);
+  const record = makeScanRecord(decodedText);
 
-  if (scannedSet.has(scanKey)) return;
+  if (scannedSet.has(record.key)) return;
 
   if (!validateRecDateBeforeSend()) {
     log("日付未入力のため送信を止めました");
     return;
   }
 
-  scannedSet.add(scanKey);
-  lastScanned = scanKey;
+  scannedSet.add(record.key);
+  scannedRecords.push(record);
+  lastScanned = record.key;
+  lastScannedRecord = record;
 
   document.getElementById("undoBtn").style.display = "block";
-  refreshScanDisplay(decodedText);
+  updateScanDisplay("読取成功 ✔ " + record.displayText);
   flashScanFrame();
 
   if (isFastMode()) {
     document.getElementById("sendBatchBtn").style.display = "block";
     document.getElementById("memoArea").style.display = "none";
     document.getElementById("returnCaseArea").style.display = "none";
-
     playBeep("success");
     if (navigator.vibrate) navigator.vibrate(100);
-
     log("読取中：最後にまとめて送信してください");
     return;
   }
@@ -648,7 +606,7 @@ function handleDecoded(decodedText) {
   sendToSheet(decodedText);
   stopQr();
 }
-  
+
 function stopQr() {
   if (!scanning) {
     log("まだ起動していません");
@@ -668,14 +626,11 @@ function stopQr() {
   video.srcObject = null;
 
   if (stream) {
-    stream.getTracks().forEach(function(track) {
-      track.stop();
-    });
+    stream.getTracks().forEach(function(track) { track.stop(); });
     stream = null;
   }
 
   log("停止しました");
-
   document.getElementById("startBtn").style.display = "block";
   document.getElementById("stopBtn").style.display = "none";
   document.getElementById("resetBtn").style.display = "none";
@@ -683,7 +638,9 @@ function stopQr() {
 
 function resetScan() {
   scannedSet.clear();
+  scannedRecords = [];
   lastScanned = "";
+  lastScannedRecord = null;
   pendingReturnItems = [];
   pendingReturnCaseId = "";
   pendingReturnMemoType = "";
@@ -700,48 +657,41 @@ function resetScan() {
   document.getElementById("returnCaseMemo").value = "";
   document.getElementById("returnCaseMemo").style.display = "none";
 
-  document.querySelectorAll('input[name="returnMemoType"]').forEach(function(radio) {
-    radio.checked = false;
-  });
-
+  document.querySelectorAll('input[name="returnMemoType"]').forEach(function(radio) { radio.checked = false; });
   log("読取履歴をリセットしました");
 }
 
 function undoLastScan() {
-  if (!lastScanned) {
+  if (!lastScannedRecord) {
     log("取消できる読取がありません");
     return;
   }
 
-  scannedSet.delete(lastScanned);
+  const undoRecord = lastScannedRecord;
+  scannedSet.delete(undoRecord.key);
+  scannedRecords = scannedRecords.filter(function(record) {
+    return record.key !== undoRecord.key;
+  });
 
-  document.getElementById("count").innerText =
-    "読取件数：" + scannedSet.size + "件";
-
-  document.getElementById("scanList").innerHTML =
-    Array.from(scannedSet).reverse().map(function(item) {
-      return '<div class="readItem">' + item + '</div>';
-    }).join("");
-
-  document.getElementById("lastRead").innerText =
-    "取消しました\n✖ " + lastScanned;
+  updateScanDisplay("取消しました\n✖ " + undoRecord.displayText);
 
   if (!isFastMode()) {
-    sendUndoToSheet(lastScanned);
+    sendUndoToSheet(undoRecord.qrText, undoRecord);
   }
 
   log("取消しました");
 
-  lastScanned = "";
+  lastScannedRecord = scannedRecords.length > 0 ? scannedRecords[scannedRecords.length - 1] : null;
+  lastScanned = lastScannedRecord ? lastScannedRecord.key : "";
 
-  if (scannedSet.size === 0) {
+  if (scannedRecords.length === 0) {
     document.getElementById("undoBtn").style.display = "none";
     document.getElementById("sendBatchBtn").style.display = "none";
   }
 }
 
 async function sendBatchToSheet() {
-  const items = Array.from(scannedSet);
+  const items = scannedRecords.map(function(record) { return record.qrText; });
 
   if (items.length === 0) {
     alert("送信するQRがありません");
@@ -760,21 +710,16 @@ async function sendBatchToSheet() {
 
   const mode = document.getElementById("mode").value;
 
-  if (!validateRecDateBeforeSend()) {
-    return;
-  }
+  if (!validateRecDateBeforeSend()) return;
 
   if (mode === "返却") {
     showReturnCaseArea(items);
     return;
   }
 
-  if (!confirm(mode + "を " + items.length + "件まとめて送信します。よろしいですか？")) {
-    return;
-  }
+  if (!confirm(mode + "を " + items.length + "件まとめて送信します。よろしいですか？")) return;
 
   stopQr();
-
   document.getElementById("sendBatchBtn").disabled = true;
   startBatchLoading("まとめて送信中");
 
@@ -784,12 +729,8 @@ async function sendBatchToSheet() {
   for (const qrText of items) {
     try {
       const result = await sendFastItem(qrText);
-
-      if (result.ok) {
-        success++;
-      } else {
-        failed.push(qrText + "：" + result.message);
-      }
+      if (result.ok) success++;
+      else failed.push(qrText + "：" + result.message);
     } catch (err) {
       failed.push(qrText + "：" + err);
     }
@@ -805,26 +746,19 @@ async function sendBatchToSheet() {
   }
 
   alert("まとめて送信完了\n" + success + "件");
-
   const sentItems = items.slice();
   const sentMode = mode;
-
   resetScan();
 
-  if (sentMode === "出庫") {
-    showShipmentPhotoArea(sentItems);
-  } else {
-    log("送信完了。続けて読み取る場合は「カメラ起動」を押してください");
-  }
+  if (sentMode === "出庫") showShipmentPhotoArea(sentItems);
+  else log("送信完了。続けて読み取る場合は「カメラ起動」を押してください");
 }
 
 function showReturnCaseArea(items) {
   pendingReturnItems = items.slice();
   pendingReturnCaseId = "RET-" + new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
-
   document.getElementById("returnCaseArea").style.display = "block";
   document.getElementById("sendBatchBtn").disabled = true;
-
   log("返却追記を選択してください");
   scrollToElement("returnCaseArea");
 }
@@ -845,13 +779,9 @@ async function sendReturnBatchAfterMemo() {
     return;
   }
 
-  if (pendingReturnMemoType === "なし") {
-    pendingReturnMemo = "追記なし";
-  }
+  if (pendingReturnMemoType === "なし") pendingReturnMemo = "追記なし";
 
-  if (!confirm("返却を " + pendingReturnItems.length + "件まとめて送信します。よろしいですか？")) {
-    return;
-  }
+  if (!confirm("返却を " + pendingReturnItems.length + "件まとめて送信します。よろしいですか？")) return;
 
   const returnButton = document.querySelector("#returnCaseArea button");
   returnButton.disabled = true;
@@ -867,12 +797,8 @@ async function sendReturnBatchAfterMemo() {
         returnMemoType: pendingReturnMemoType,
         returnMemo: pendingReturnMemo
       });
-
-      if (result.ok) {
-        success++;
-      } else {
-        failed.push(qrText + "：" + result.message);
-      }
+      if (result.ok) success++;
+      else failed.push(qrText + "：" + result.message);
     } catch (err) {
       failed.push(qrText + "：" + err);
     }
@@ -887,14 +813,7 @@ async function sendReturnBatchAfterMemo() {
     return;
   }
 
-  alert(
-    "返却まとめて送信完了\n" +
-    success +
-    "件\n\n案件追記：" +
-    pendingReturnMemo +
-    "\n\n続けて読み取る場合は『カメラ起動』を押してください"
-  );
-
+  alert("返却まとめて送信完了\n" + success + "件\n\n案件追記：" + pendingReturnMemo + "\n\n続けて読み取る場合は『カメラ起動』を押してください");
   stopQr();
   resetScan();
   log("返却送信完了。続けて読み取る場合は『カメラ起動』を押してください");
@@ -902,18 +821,13 @@ async function sendReturnBatchAfterMemo() {
 
 function sendFastItem(qrText, extraData) {
   const data = buildBaseSendData(qrText);
-
-  if (extraData) {
-    Object.assign(data, extraData);
-  }
+  if (extraData) Object.assign(data, extraData);
 
   return fetch(GAS_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain" },
     body: JSON.stringify(data)
-  }).then(function(response) {
-    return response.json();
-  });
+  }).then(function(response) { return response.json(); });
 }
 
 function showShipmentPhotoArea(items) {
@@ -926,34 +840,24 @@ function showShipmentPhotoArea(items) {
   };
 
   selectedShipmentPhotos = [];
-
   document.getElementById("shipmentPhotoArea").style.display = "block";
   document.getElementById("shipmentPhotoPreview").innerText =
     "出庫送信完了。\n1枚目は出庫伝票推奨。\nカメラで1枚ずつ追加、またはライブラリから最大6枚選択できます。";
-
   document.getElementById("uploadShipmentPhotoBtn").style.display = "none";
   document.getElementById("uploadShipmentPhotoBtn").disabled = false;
   document.getElementById("shipmentCameraInput").value = "";
   document.getElementById("shipmentLibraryInput").value = "";
-
   log("出庫送信完了。写真添付を選択してください");
   scrollToElement("shipmentPhotoArea");
 }
 
-function chooseShipmentCamera() {
-  document.getElementById("shipmentCameraInput").click();
-}
-
-function chooseShipmentLibrary() {
-  document.getElementById("shipmentLibraryInput").click();
-}
+function chooseShipmentCamera() { document.getElementById("shipmentCameraInput").click(); }
+function chooseShipmentLibrary() { document.getElementById("shipmentLibraryInput").click(); }
 
 function addShipmentCameraPhoto() {
   const input = document.getElementById("shipmentCameraInput");
   const files = Array.from(input.files || []);
-
   if (files.length === 0) return;
-
   addShipmentPhotosToList(files);
   input.value = "";
 }
@@ -961,9 +865,7 @@ function addShipmentCameraPhoto() {
 function addShipmentLibraryPhotos() {
   const input = document.getElementById("shipmentLibraryInput");
   const files = Array.from(input.files || []);
-
   if (files.length === 0) return;
-
   addShipmentPhotosToList(files);
   input.value = "";
 }
@@ -973,36 +875,26 @@ function addShipmentPhotosToList(files) {
     alert("写真は最大6枚までです。\n現在：" + selectedShipmentPhotos.length + "枚");
     return;
   }
-
-  files.forEach(function(file) {
-    selectedShipmentPhotos.push(file);
-  });
-
+  files.forEach(function(file) { selectedShipmentPhotos.push(file); });
   updateShipmentPhotoPreview();
 }
 
 function updateShipmentPhotoPreview() {
   const count = selectedShipmentPhotos.length;
-
   if (count === 0) {
-    document.getElementById("shipmentPhotoPreview").innerText =
-      "写真はまだ選択されていません。";
+    document.getElementById("shipmentPhotoPreview").innerText = "写真はまだ選択されていません。";
     document.getElementById("uploadShipmentPhotoBtn").style.display = "none";
     return;
   }
-
   document.getElementById("shipmentPhotoPreview").innerText =
     count + "枚追加済み\n最大6枚まで。1枚のコラージュ画像にして保存します。";
-
   document.getElementById("uploadShipmentPhotoBtn").style.display = "block";
 }
 
 function clearShipmentPhotos() {
   selectedShipmentPhotos = [];
-
   document.getElementById("shipmentCameraInput").value = "";
   document.getElementById("shipmentLibraryInput").value = "";
-
   updateShipmentPhotoPreview();
 }
 
@@ -1013,10 +905,8 @@ function skipShipmentPhotos() {
   document.getElementById("shipmentPhotoPreview").innerText = "";
   document.getElementById("uploadShipmentPhotoBtn").style.display = "none";
   document.getElementById("uploadShipmentPhotoBtn").disabled = false;
-
   selectedShipmentPhotos = [];
   lastShipmentPhotoInfo = null;
-
   log("写真なしで完了しました。続けて読み取る場合は「カメラ起動」を押してください");
 }
 
@@ -1027,12 +917,10 @@ async function uploadShipmentPhotos() {
     alert("出庫情報がありません");
     return;
   }
-
   if (files.length === 0) {
     alert("写真を選択してください");
     return;
   }
-
   if (files.length > 6) {
     alert("写真は最大6枚までです");
     return;
@@ -1044,7 +932,6 @@ async function uploadShipmentPhotos() {
 
   try {
     const collageBase64 = await makeShipmentCollage(files, lastShipmentPhotoInfo);
-
     log("出庫写真を保存中...");
 
     const result = await fetch(GAS_URL, {
@@ -1055,9 +942,7 @@ async function uploadShipmentPhotos() {
         photoBase64: collageBase64,
         photoInfo: lastShipmentPhotoInfo
       })
-    }).then(function(response) {
-      return response.json();
-    });
+    }).then(function(response) { return response.json(); });
 
     if (!result.ok) {
       alert("写真保存失敗\n" + result.message);
@@ -1067,17 +952,14 @@ async function uploadShipmentPhotos() {
     }
 
     alert("出庫写真を保存しました");
-
     document.getElementById("shipmentPhotoArea").style.display = "none";
     document.getElementById("shipmentCameraInput").value = "";
     document.getElementById("shipmentLibraryInput").value = "";
     document.getElementById("shipmentPhotoPreview").innerText = "";
     btn.style.display = "none";
     btn.disabled = false;
-
     selectedShipmentPhotos = [];
     lastShipmentPhotoInfo = null;
-
     log("写真保存完了。続けて読み取る場合は「カメラ起動」を押してください");
 
   } catch (err) {
@@ -1090,7 +972,6 @@ async function uploadShipmentPhotos() {
 function makeShipmentCollage(files, info) {
   return new Promise(async function(resolve) {
     const images = [];
-
     for (const file of files) {
       const img = await loadPhotoImage(file);
       images.push(img);
@@ -1105,47 +986,35 @@ function makeShipmentCollage(files, info) {
     const canvas = document.createElement("canvas");
     canvas.width = cols * cellW;
     canvas.height = rows * cellH + headerH;
-
     const ctx = canvas.getContext("2d");
 
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
     ctx.fillStyle = "#000000";
     ctx.font = "38px sans-serif";
     ctx.fillText("出庫写真", 20, 48);
-
     ctx.font = "28px sans-serif";
     ctx.fillText("日時：" + new Date().toLocaleString("ja-JP"), 20, 88);
     ctx.fillText("担当：" + (info.user || ""), 20, 128);
 
     const idText = (info.ids || []).join(" ");
     ctx.fillText("QR：" + idText.slice(0, 78), 520, 88);
-    if (idText.length > 78) {
-      ctx.fillText(idText.slice(78, 156), 520, 128);
-    }
+    if (idText.length > 78) ctx.fillText(idText.slice(78, 156), 520, 128);
 
     for (let i = 0; i < 6; i++) {
       const x = (i % cols) * cellW;
       const y = Math.floor(i / cols) * cellH + headerH;
-
       ctx.strokeStyle = "#cccccc";
       ctx.strokeRect(x, y, cellW, cellH);
-
       ctx.fillStyle = "#f5f5f5";
       ctx.fillRect(x + 1, y + 1, cellW - 2, cellH - 2);
-
-      if (images[i]) {
-        drawImageCover(ctx, images[i], x, y, cellW, cellH);
-      }
-
+      if (images[i]) drawImageCover(ctx, images[i], x, y, cellW, cellH);
       ctx.fillStyle = "rgba(0,0,0,0.65)";
       ctx.fillRect(x + 10, y + 10, 92, 44);
       ctx.fillStyle = "#ffffff";
       ctx.font = "30px sans-serif";
       ctx.fillText((i + 1) + "枚目", x + 18, y + 42);
     }
-
     resolve(canvas.toDataURL("image/jpeg", 0.92));
   });
 }
@@ -1153,15 +1022,11 @@ function makeShipmentCollage(files, info) {
 function loadPhotoImage(file) {
   return new Promise(function(resolve) {
     const reader = new FileReader();
-
     reader.onload = function(e) {
       const img = new Image();
-      img.onload = function() {
-        resolve(img);
-      };
+      img.onload = function() { resolve(img); };
       img.src = e.target.result;
     };
-
     reader.readAsDataURL(file);
   });
 }
@@ -1172,7 +1037,6 @@ function drawImageCover(ctx, img, x, y, w, h) {
   const nh = img.height * scale;
   const nx = x + (w - nw) / 2;
   const ny = y + (h - nh) / 2;
-
   ctx.save();
   ctx.beginPath();
   ctx.rect(x, y, w, h);
@@ -1189,11 +1053,8 @@ function sendToSheet(qrText) {
     送信ID: ""
   };
 
-  document.getElementById("memoTarget").innerText =
-    "現在の追記対象：\n送信確認中 / " + qrText;
-
+  document.getElementById("memoTarget").innerText = "現在の追記対象：\n送信確認中 / " + qrText;
   startMemoLoading(qrText);
-
   document.getElementById("memoText").value = "";
   document.getElementById("memoText").disabled = false;
   document.querySelector("#memoArea button").disabled = true;
@@ -1206,9 +1067,7 @@ function sendToSheet(qrText) {
     headers: { "Content-Type": "text/plain" },
     body: JSON.stringify(data)
   })
-  .then(function(response) {
-    return response.json();
-  })
+  .then(function(response) { return response.json(); })
   .then(function(result) {
     if (!result.ok) {
       alert("送信失敗\n" + result.message);
@@ -1218,11 +1077,8 @@ function sendToSheet(qrText) {
     if (result.lastItem) {
       stopMemoLoading();
       lastItemForMemo = result.lastItem;
-
       document.getElementById("memoTarget").innerText =
-        "現在の追記対象：\n" +
-        lastItemForMemo.機種表示 + " / " + lastItemForMemo.管理番号;
-
+        "現在の追記対象：\n" + lastItemForMemo.機種表示 + " / " + lastItemForMemo.管理番号;
       document.getElementById("memoText").value = "";
       document.getElementById("memoText").disabled = false;
       document.querySelector("#memoArea button").disabled = false;
@@ -1236,7 +1092,6 @@ function sendToSheet(qrText) {
 
   playBeep("success");
   if (navigator.vibrate) navigator.vibrate(100);
-
   log("読取成功");
 }
 
@@ -1248,7 +1103,6 @@ function sendMemo() {
     alert("追記対象がありません");
     return;
   }
-
   if (!memo) {
     alert("追記内容を入力してください");
     return;
@@ -1256,7 +1110,6 @@ function sendMemo() {
 
   const savedItem = lastItemForMemo;
   const savedTarget = savedItem.機種表示 + " / " + savedItem.管理番号;
-
   const data = {
     action: "addMemo",
     kanriNo: savedItem.管理番号,
@@ -1276,33 +1129,22 @@ function sendMemo() {
     headers: { "Content-Type": "text/plain" },
     body: JSON.stringify(data)
   })
-  .then(function(response) {
-    return response.json();
-  })
+  .then(function(response) { return response.json(); })
   .then(function(result) {
     if (result.ok) {
       stopMemoLoading();
-
       alert("追記を保存しました\n" + savedTarget);
-
       memoTextArea.value = "";
       memoTextArea.blur();
-
       document.getElementById("memoText").disabled = true;
-      document.getElementById("memoTarget").innerText =
-        "追記保存済：" + savedTarget + "\n次のQRを読んでください";
-
+      document.getElementById("memoTarget").innerText = "追記保存済：" + savedTarget + "\n次のQRを読んでください";
       log("追記保存済\n次のQRを読んでください");
-
       lastItemForMemo = null;
       document.querySelector("#memoArea button").disabled = false;
-
     } else {
       stopMemoLoading();
-
       memoTextArea.disabled = false;
       document.querySelector("#memoArea button").disabled = false;
-
       alert("追記保存失敗\n" + result.message);
       log("追記保存失敗");
     }
@@ -1310,7 +1152,6 @@ function sendMemo() {
   .catch(function(err) {
     memoTextArea.disabled = false;
     document.querySelector("#memoArea button").disabled = false;
-
     alert("追記保存エラー\n" + err);
     log("追記保存エラー");
   });
@@ -1319,33 +1160,25 @@ function sendMemo() {
 function restartQrCamera() {
   scanning = false;
   scanBusy = false;
-
   const video = document.getElementById("video");
-
   if (video) {
     video.pause();
     video.srcObject = null;
   }
-
   if (stream) {
-    stream.getTracks().forEach(function(track) {
-      track.stop();
-    });
+    stream.getTracks().forEach(function(track) { track.stop(); });
     stream = null;
   }
-
-  setTimeout(function() {
-    startQr();
-  }, 300);
+  setTimeout(function() { startQr(); }, 300);
 }
 
-function sendUndoToSheet(qrText) {
+function sendUndoToSheet(qrText, record) {
   const data = {
     mode: "取消",
     qr: qrText,
-    user: document.getElementById("user").value,
-    location: document.getElementById("location").value,
-    recTarget: document.getElementById("recTarget").value
+    user: record ? record.user : document.getElementById("user").value,
+    location: record ? record.location : document.getElementById("location").value,
+    recTarget: record ? record.recTarget : document.getElementById("recTarget").value
   };
 
   fetch(GAS_URL, {
@@ -1364,10 +1197,8 @@ document.getElementById("recTarget").addEventListener("change", saveSelections);
 document.querySelectorAll('input[name="returnMemoType"]').forEach(function(radio) {
   radio.addEventListener("change", function() {
     const memoBox = document.getElementById("returnCaseMemo");
-
-    if (this.value === "あり") {
-      memoBox.style.display = "block";
-    } else {
+    if (this.value === "あり") memoBox.style.display = "block";
+    else {
       memoBox.style.display = "none";
       memoBox.value = "";
     }

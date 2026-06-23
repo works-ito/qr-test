@@ -343,6 +343,18 @@ function makeScanKey(qrText) {
   return qrText;
 }
 
+  function formatScanItemForDisplay(item) {
+  const parts = String(item).split("__");
+
+  if (parts.length === 3) {
+    const qr = parts[0];
+    const recTarget = parts[2];
+    return qr + "（" + recTarget + "）";
+  }
+
+  return item;
+}
+  
 function makeScanRecord(qrText) {
   const mode = document.getElementById("mode").value;
   const recTarget = document.getElementById("recTarget").value;
@@ -372,7 +384,16 @@ function updateScanDisplay(lastMessage) {
 }
 
 function refreshScanDisplay(decodedText) {
-  updateScanDisplay("読取成功 ✔ " + decodedText);
+  document.getElementById("lastRead").innerText =
+    "読取成功 ✔ " + formatScanItemForDisplay(lastScanned || decodedText);
+
+  document.getElementById("count").innerText =
+    "読取件数：" + scannedSet.size + "件";
+
+  document.getElementById("scanList").innerHTML =
+    Array.from(scannedSet).reverse().map(function(item) {
+      return '<div class="readItem">' + formatScanItemForDisplay(item) + '</div>';
+    }).join("");
 }
 
 function flashScanFrame() {

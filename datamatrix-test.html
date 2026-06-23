@@ -211,6 +211,12 @@ textarea {
   <div id="memoTarget" style="font-weight:bold; margin-bottom:10px;"></div>
   <textarea id="memoText" placeholder="燃料不足・付属品未返却・破損あり等"></textarea>
   <button onclick="sendMemo()">追記を保存</button>
+  <button
+  id="skipMemoBtn"
+  onclick="skipMemo()"
+  style="display:none;">
+  追記なしで完了
+</button>
 </div>
 
 <div id="returnCaseArea">
@@ -1080,7 +1086,13 @@ function sendToSheet(qrText) {
   document.getElementById("memoText").disabled = false;
   document.querySelector("#memoArea button").disabled = true;
   document.getElementById("memoArea").style.display = "block";
+  const mode = document.getElementById("mode").value;
 
+document.getElementById("skipMemoBtn").style.display =
+  ["校正中","校正完了","交換完了"].includes(mode)
+    ? "block"
+    : "none";
+  
   const data = buildBaseSendData(qrText);
 
   fetch(GAS_URL, {
@@ -1116,6 +1128,18 @@ function sendToSheet(qrText) {
   log("読取成功");
 }
 
+function skipMemo() {
+  stopMemoLoading();
+
+  document.getElementById("memoText").value = "";
+  document.getElementById("memoText").disabled = true;
+  document.getElementById("memoArea").style.display = "none";
+
+  lastItemForMemo = null;
+
+  log("追記なしで完了しました。続けて読み取る場合は「カメラ起動」を押してください");
+}
+  
 function sendMemo() {
   const memoTextArea = document.getElementById("memoText");
   const memo = memoTextArea.value.trim();

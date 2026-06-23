@@ -490,12 +490,31 @@ function toggleRecTarget() {
   const recModes = ["校正中", "校正完了", "交換完了"];
   const dateModes = ["校正完了", "交換完了"];
 
+const recTarget = document.getElementById("recTarget");
+
 if (mode === "交換完了") {
-  document.getElementById("recTarget").value = "内部USB";
+
+  recTarget.innerHTML = `
+    <option value="内部USB">内部USB</option>
+  `;
+
+  recTarget.value = "内部USB";
+
   document.getElementById("recTargetBox").style.display = "block";
+
+} else if (mode === "校正中" || mode === "校正完了") {
+
+  recTarget.innerHTML = `
+    <option value="騒音計">騒音計</option>
+    <option value="振動計">振動計</option>
+  `;
+
+  document.getElementById("recTargetBox").style.display = "block";
+
 } else {
-  document.getElementById("recTargetBox").style.display =
-    recModes.includes(mode) ? "block" : "none";
+
+  document.getElementById("recTargetBox").style.display = "none";
+
 }
   document.getElementById("recDateBox").style.display = dateModes.includes(mode) ? "block" : "none";
   document.getElementById("recDateLabel").innerText = getRecDateLabelText();

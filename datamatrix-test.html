@@ -188,7 +188,9 @@ textarea {
 <button id="resetBtn" onclick="resetScan()" style="display:none;">読取リセット</button>
 <button id="undoBtn" onclick="undoLastScan()" style="display:none;">最後の読取取消</button>
 <button id="sendBatchBtn" onclick="sendBatchToSheet()" style="display:none;">読取分をまとめて送信</button>
-
+<button id="cancelLastSendBtn" onclick="cancelLastSend()" style="display:none; background:#ffe0e0;">
+  直前送信を取消
+</button>
 <div id="status">未クリック</div>
 <div id="lastRead"></div>
 
@@ -283,7 +285,8 @@ let pendingRecMemo = "";
 
 let lastShipmentPhotoInfo = null;
 let selectedShipmentPhotos = [];
-
+let lastSentLogIds = [];
+  
 const SCAN_INTERVAL = 120;
 const CROP_RATIO = 0.55;
 const FAST_MODES = ["出庫", "完成機", "返却", "修理中"];
@@ -840,7 +843,7 @@ async function sendBatchToSheet() {
       log("一部送信失敗あり");
       return;
     }
-
+rememberSentLogIds(result);
     alert("まとめて送信完了\n" + result.successCount + "件");
 
     const sentItems = scannedRecords.map(function(record) {
@@ -931,7 +934,7 @@ async function sendRecBatchAfterMemo() {
       log("一部送信失敗あり");
       return;
     }
-
+rememberSentLogIds(result);
     alert(
       "REC送信完了\n" +
       result.successCount + "件" +
@@ -1000,7 +1003,7 @@ async function sendReturnBatchAfterMemo() {
       log("一部送信失敗あり");
       return;
     }
-
+rememberSentLogIds(result);
     alert(
       "返却まとめて送信完了\n" +
       result.successCount + "件\n\n案件追記：" +
@@ -1316,7 +1319,7 @@ document.getElementById("skipMemoBtn").style.display =
       alert("送信失敗\n" + result.message);
       return;
     }
-
+rememberSentLogIds(result);
     if (result.lastItem) {
       stopMemoLoading();
       lastItemForMemo = result.lastItem;
@@ -1427,6 +1430,73 @@ function restartQrCamera() {
   setTimeout(function() { startQr(); }, 300);
 }
 
+  function rememberSentLogIds(result) {
+  lastSentLogIds = [];
+
+  if (result.logId) {
+    lastSentLogIds.push(result.logId);
+  }
+
+  if (Array.isArray(result.logIds)) {
+    lastSentLogIds = lastSentLogIds.concat(result.logIds);
+  }
+
+  if (Array.isArray(result.results)) {
+    result.results.forEach(function(item) {
+      if (item.logId) lastSentLogIds.push(item.logId);
+    });
+  }
+
+  lastSentLogIds = Array.from(new Set(lastSentLogIds));
+
+  document.getElementById("cancelLastSendBtn").style.display =
+    lastSentLogIds.length > 0 ? "block" : "none";
+}
+
+async function cancelLastSend() {
+  if (lastSentLogIds.length === 0) {
+    alert("取消できる直前送信がありません");
+    return;
+  }
+
+  if (!confirm("直前送信 " + lastSentLogIds.length + "件を取消します。よろしいですか？")) {
+    return;
+  }
+
+  const btn = document.getElementById("cancelLastSendBtn");
+  btn.disabled = true;
+  log("取消送信中...");
+
+  try {
+    for (const logId of lastSentLogIds) {
+      const result = await fetch(GAS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({
+          action: "cancel",
+          targetLogId: logId
+        })
+      }).then(function(response) {
+        return response.json();
+      });
+
+      if (!result.ok) {
+        throw new Error(result.message || "取消失敗：" + logId);
+      }
+    }
+
+    alert("取消しました");
+    lastSentLogIds = [];
+    btn.style.display = "none";
+    btn.disabled = false;
+    log("直前送信を取消しました");
+
+  } catch (err) {
+    btn.disabled = false;
+    alert("取消エラー\n" + err);
+    log("取消エラー");
+  }
+}
 function sendUndoToSheet(qrText, record) {
   const data = {
     mode: "取消",

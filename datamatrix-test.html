@@ -290,7 +290,14 @@ let lastSentLogIds = [];
   
 const SCAN_INTERVAL = 120;
 const CROP_RATIO = 0.55;
-const FAST_MODES = ["出庫", "出庫取消", "完成機", "返却", "修理中"];
+const FAST_MODES = [
+  "出庫",
+  "出庫取消",
+  "返却",
+  "修理中",
+  "完成機",
+  "拠点移動"
+];
 const REC_MODES = ["校正中", "校正完了", "交換完了"];
 
 function isFastMode() {
@@ -815,7 +822,7 @@ async function sendBatchToSheet() {
   }
 
   if (!FAST_MODES.includes(mode)) {
-     alert("まとめて送信は出庫・出庫取消・完成機・返却・修理中のみです");
+     alert("まとめて送信できない作業区分です");
      return;
 }
 

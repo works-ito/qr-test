@@ -287,6 +287,7 @@ let pendingRecMemo = "";
 let lastShipmentPhotoInfo = null;
 let selectedShipmentPhotos = [];
 let lastSentLogIds = [];
+let lastPendingSendId = "";
   
 const SCAN_INTERVAL = 120;
 const CROP_RATIO = 0.55;
@@ -926,10 +927,11 @@ rememberSentLogIds(result);
     }
 
   } catch (err) {
-    stopBatchLoading();
-    document.getElementById("sendBatchBtn").disabled = false;
-    alert("まとめて送信エラー\n" + err);
-    log("まとめて送信エラー");
+    handleBatchUnknownError(
+      err,
+      document.getElementById("sendBatchBtn"),
+      "まとめて送信"
+    );
   }
 }
 
@@ -1011,10 +1013,7 @@ rememberSentLogIds(result);
     log("REC送信完了。続けて読み取る場合は「カメラ起動」を押してください");
 
   } catch (err) {
-    stopBatchLoading();
-    btn.disabled = false;
-    alert("REC送信エラー\n" + err);
-    log("REC送信エラー");
+    handleBatchUnknownError(err, btn, "REC送信");
   }
 }
 
@@ -1082,10 +1081,7 @@ rememberSentLogIds(result);
     log("返却送信完了。続けて読み取る場合は『カメラ起動』を押してください");
 
   } catch (err) {
-    stopBatchLoading();
-    returnButton.disabled = false;
-    alert("返却まとめて送信エラー\n" + err);
-    log("返却まとめて送信エラー");
+    handleBatchUnknownError(err, returnButton, "返却まとめて送信");
   }
 }
 function createBatchId() {
@@ -1108,6 +1104,7 @@ function buildBatchRecordData(record) {
 
 function sendBatchRecords(records, options) {
   const batchId = createBatchId();
+  lastPendingSendId = batchId;
 
   records = records.map(function(record) {
     return Object.assign({}, record, {
@@ -1129,11 +1126,44 @@ function sendBatchRecords(records, options) {
     method: "POST",
     headers: { "Content-Type": "text/plain" },
     body: JSON.stringify(payload)
-  }).then(function(response) {
-    return response.json();
+  }).then(async function(response) {
+    const text = await response.text();
+    console.log("GAS RESPONSE:", text);
+
+    try {
+      const result = JSON.parse(text);
+      if (!result.sendId) result.sendId = batchId;
+      return result;
+    } catch (err) {
+      const unknownError = new Error(
+        "送信結果の取得に失敗しました。スプレッドシートに反映済みの可能性があります。\n送信ID：" +
+        batchId +
+        "\n\n" +
+        text.slice(0, 200)
+      );
+      unknownError.sendId = batchId;
+      throw unknownError;
+    }
   });
 }
 
+function handleBatchUnknownError(err, buttonElement, messagePrefix) {
+  stopBatchLoading();
+
+  if (buttonElement) {
+    buttonElement.disabled = false;
+  }
+
+  if (lastPendingSendId) {
+    lastSentLogIds = [lastPendingSendId];
+    const cancelBtn = document.getElementById("cancelLastSendBtn");
+    cancelBtn.style.display = "block";
+    cancelBtn.disabled = false;
+  }
+
+  alert(messagePrefix + "結果不明\n" + err);
+  log("送信結果不明。スプレッドシートを確認してください");
+}
 function showBatchFailure(result) {
   const results = Array.isArray(result.results) ? result.results : [];
   const failed = results.filter(function(item) {
@@ -1518,33 +1548,38 @@ function rememberSentLogIds(result) {
 
   let sendId = "";
 
-  if (result.sendId) {
-    sendId = result.sendId;
+  if (result && result.sendId) {
+    sendId = String(result.sendId).trim();
   }
 
-  if (!sendId && Array.isArray(result.results)) {
+  if (!sendId && result && Array.isArray(result.results)) {
     result.results.forEach(function(item) {
       if (!sendId && item.lastItem && item.lastItem.送信ID) {
-        sendId = item.lastItem.送信ID;
+        sendId = String(item.lastItem.送信ID).trim();
       }
     });
   }
 
-  if (sendId) {
-    lastSentLogIds = [sendId];
-  }
+  lastSentLogIds = sendId ? [sendId] : [];
 
-  document.getElementById("cancelLastSendBtn").style.display =
-    sendId ? "block" : "none";
+  const btn = document.getElementById("cancelLastSendBtn");
+  btn.style.display = sendId ? "block" : "none";
+  btn.disabled = false;
+
+  console.log("直前送信ID:", sendId);
 }
-
 async function cancelLastSend() {
-  if (lastSentLogIds.length === 0) {
+  if (!lastSentLogIds || lastSentLogIds.length === 0) {
     alert("取消できる直前送信がありません");
     return;
   }
 
-  const sendId = lastSentLogIds[0];
+  const sendId = String(lastSentLogIds[0] || "").trim();
+
+  if (!sendId) {
+    alert("取消対象の送信IDが空です");
+    return;
+  }
 
   if (!confirm("直前送信を取消しますか？")) {
     return;
@@ -1552,19 +1587,27 @@ async function cancelLastSend() {
 
   const btn = document.getElementById("cancelLastSendBtn");
   btn.disabled = true;
-  log("直前送信を取消中...");
+  log("直前送信を取消中...\n送信ID：" + sendId);
 
   try {
-    const result = await fetch(GAS_URL, {
+    const response = await fetch(GAS_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain" },
       body: JSON.stringify({
         action: "cancelSend",
         sendId: sendId
       })
-    }).then(function(response) {
-      return response.json();
     });
+
+    const text = await response.text();
+    console.log("CANCEL RESPONSE:", text);
+
+    let result;
+    try {
+      result = JSON.parse(text);
+    } catch (parseErr) {
+      throw new Error("取消結果の取得に失敗しました\n" + text.slice(0, 200));
+    }
 
     if (!result.ok) {
       throw new Error(result.message || "取消に失敗しました");
@@ -1572,6 +1615,7 @@ async function cancelLastSend() {
 
     alert("取消しました\n" + result.cancelCount + "件");
     lastSentLogIds = [];
+    lastPendingSendId = "";
     btn.style.display = "none";
     btn.disabled = false;
     log("直前送信を取消しました");

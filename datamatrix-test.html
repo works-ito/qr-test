@@ -76,7 +76,7 @@ select {
 .readItem { margin-bottom:4px; }
 canvas { display:none; }
 
-#memoArea, #returnCaseArea, #shipmentPhotoArea, #returnPhotoArea, #recDateBox, #recSendArea {
+#memoArea, #returnMethodArea, #returnCaseArea, #shipmentPhotoArea, #returnPhotoArea, #recDateBox, #recSendArea {
   display:none;
   margin-top:20px;
   padding:12px;
@@ -235,6 +235,12 @@ textarea {
   <button onclick="sendRecBatchAfterMemo()">REC読取分を送信</button>
 </div>
 
+<div id="returnMethodArea">
+  <div style="font-weight:bold; margin-bottom:10px;">返却方法を選択してください</div>
+  <button onclick="selectReturnWithQr()">QRあり：QRを読み取って返却登録する</button>
+  <button onclick="selectReturnNoQr()">QRなし：写真・追記だけ保存する</button>
+</div>
+
 <div id="returnCaseArea">
   <div style="font-weight:bold; margin-bottom:10px;">返却案件の追記</div>
   <label><input type="radio" name="returnMemoType" value="なし">追記なし</label><br>
@@ -293,6 +299,7 @@ let pendingReturnItems = [];
 let pendingReturnCaseId = "";
 let pendingReturnMemoType = "";
 let pendingReturnMemo = "";
+let returnQrMode = "";
 
 let pendingRecRecords = [];
 let pendingRecMemoType = "";
@@ -599,6 +606,43 @@ if (mode === "交換完了") {
   document.getElementById("recDateLabel").innerText = getRecDateLabelText();
 
   if (dateModes.includes(mode)) ensureRecDateDefault();
+
+  if (mode === "返却") {
+    document.getElementById("returnMethodArea").style.display = "block";
+    log("返却方法を選択してください");
+  } else {
+    document.getElementById("returnMethodArea").style.display = "none";
+    returnQrMode = "";
+  }
+}
+
+function selectReturnWithQr() {
+  returnQrMode = "QRあり";
+  document.getElementById("returnMethodArea").style.display = "none";
+  log("QRあり返却：カメラ起動してQRを読み取ってください");
+}
+
+function selectReturnNoQr() {
+  if (!document.getElementById("user").value) {
+    alert("担当者を選択してください");
+    return;
+  }
+
+  returnQrMode = "QRなし";
+  pendingReturnItems = [];
+  pendingReturnCaseId = "RET-" + new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
+
+  document.getElementById("returnMethodArea").style.display = "none";
+  document.getElementById("returnCaseArea").style.display = "block";
+
+  document.getElementById("returnCaseMemo").value = "";
+  document.getElementById("returnCaseMemo").style.display = "none";
+  document.querySelectorAll('input[name="returnMemoType"]').forEach(function(radio) {
+    radio.checked = false;
+  });
+
+  log("QRなし返却：追記あり／なしを選択してください");
+  scrollToElement("returnCaseArea");
 }
 
 function playBeep(type) {
@@ -619,6 +663,18 @@ function playBeep(type) {
 }
 
 async function startQr() {
+  if (document.getElementById("mode").value === "返却" && returnQrMode === "") {
+    alert("先に返却方法を選択してください");
+    document.getElementById("returnMethodArea").style.display = "block";
+    scrollToElement("returnMethodArea");
+    return;
+  }
+
+  if (document.getElementById("mode").value === "返却" && returnQrMode === "QRなし") {
+    alert("QRなし返却ではカメラ起動は不要です");
+    return;
+  }
+
   const isLatest = await checkAppVersionNow();
 
   if (!isLatest) {
@@ -808,6 +864,8 @@ function resetScan() {
   pendingReturnCaseId = "";
   pendingReturnMemoType = "";
   pendingReturnMemo = "";
+  returnQrMode = "";
+  document.getElementById("returnMethodArea").style.display = "none";
   pendingRecRecords = [];
   pendingRecMemoType = "";
   pendingRecMemo = "";
@@ -1062,6 +1120,30 @@ async function sendReturnBatchAfterMemo() {
   }
 
   const memoForLog = pendingReturnMemoType === "あり" ? pendingReturnMemo : "";
+
+  if (returnQrMode === "QRなし") {
+    const sentReturnPhotoInfo = {
+      mode: "返却",
+      sendId: pendingReturnCaseId,
+      returnCaseId: pendingReturnCaseId,
+      ids: [],
+      user: document.getElementById("user").value,
+      location: document.getElementById("location").value,
+      memo: memoForLog,
+      createdAt: new Date().toISOString()
+    };
+
+    alert(
+      "QRなし返却を受付しました\n\n案件追記：" +
+      (memoForLog || "追記なし") +
+      "\n\n必要に応じて返却写真を保存してください"
+    );
+
+    document.getElementById("returnCaseArea").style.display = "none";
+    showReturnPhotoArea(sentReturnPhotoInfo);
+    log("QRなし返却。写真保存の有無を選択してください");
+    return;
+  }
 
   if (!confirm("返却を " + pendingReturnItems.length + "件まとめて送信します。よろしいですか？")) {
     return;

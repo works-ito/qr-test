@@ -323,6 +323,8 @@ const FAST_MODES = [
   "拠点移動"
 ];
 const REC_MODES = ["校正中", "校正完了", "交換完了"];
+const AUTO_RELOAD_MINUTES = 30;
+let lastHiddenTime = null;
 
 function isFastMode() {
   return FAST_MODES.includes(document.getElementById("mode").value);
@@ -1989,6 +1991,31 @@ loadSelections();
 toggleRecTarget();
 checkAppVersion();
 setInterval(checkAppVersion, 10000);
+document.addEventListener("visibilitychange", function () {
+
+  if (document.visibilityState === "hidden") {
+    lastHiddenTime = Date.now();
+    return;
+  }
+
+  if (document.visibilityState !== "visible") return;
+
+  if (!lastHiddenTime) return;
+
+  const elapsed = Date.now() - lastHiddenTime;
+
+  if (elapsed < AUTO_RELOAD_MINUTES * 60 * 1000) {
+    return;
+  }
+
+  // 読取途中ならリロードしない
+  if (scannedRecords.length > 0) {
+    return;
+  }
+
+  location.href = location.pathname + "?v=" + Date.now();
+
+});
 </script>
 </body>
 </html>

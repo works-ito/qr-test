@@ -610,6 +610,7 @@ if (mode === "交換完了") {
   if (mode === "返却") {
     document.getElementById("returnMethodArea").style.display = "block";
     log("返却方法を選択してください");
+    scrollToElement("returnMethodArea");
   } else {
     document.getElementById("returnMethodArea").style.display = "none";
     returnQrMode = "";

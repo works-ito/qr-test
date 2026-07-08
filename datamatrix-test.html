@@ -76,7 +76,7 @@ select {
 .readItem { margin-bottom:4px; }
 canvas { display:none; }
 
-#memoArea, #returnCaseArea, #shipmentPhotoArea, #recDateBox, #recSendArea {
+#memoArea, #returnCaseArea, #shipmentPhotoArea, #returnPhotoArea, #recDateBox, #recSendArea {
   display:none;
   margin-top:20px;
   padding:12px;
@@ -108,11 +108,12 @@ canvas { display:none; }
 #returnCaseArea { background:#eef; }
 #recSendArea { background:#fffbe6; }
 #shipmentPhotoArea { background:#eefaf0; }
-#shipmentPhotoArea p {
+#returnPhotoArea { background:#eefaf0; }
+#shipmentPhotoArea p, #returnPhotoArea p {
   font-size:18px;
   margin:6px 0 12px;
 }
-#shipmentPhotoPreview {
+#shipmentPhotoPreview, #returnPhotoPreview {
   font-size:18px;
   white-space:pre-wrap;
   margin:8px 0;
@@ -255,6 +256,19 @@ textarea {
   <button id="uploadShipmentPhotoBtn" onclick="uploadShipmentPhotos()" style="display:none;">写真を保存</button>
 </div>
 
+<div id="returnPhotoArea">
+  <div style="font-weight:bold; margin-bottom:10px;">返却写真の添付</div>
+  <p>QR未取付機・返却伝票・破損・付属品不足などがある場合に保存。最大6枚まで。</p>
+  <button onclick="skipReturnPhotos()">写真なしで完了</button>
+  <input type="file" id="returnCameraInput" accept="image/*" capture="environment" style="display:none;" onchange="addReturnCameraPhoto()">
+  <input type="file" id="returnLibraryInput" accept="image/*" multiple style="display:none;" onchange="addReturnLibraryPhotos()">
+  <button onclick="chooseReturnCamera()">カメラで1枚ずつ追加</button>
+  <button onclick="chooseReturnLibrary()">ライブラリから選ぶ</button>
+  <button onclick="clearReturnPhotos()">選択写真をクリア</button>
+  <div id="returnPhotoPreview"></div>
+  <button id="uploadReturnPhotoBtn" onclick="uploadReturnPhotos()" style="display:none;">返却写真を保存</button>
+</div>
+
 <script>
 const GAS_URL = "https://script.google.com/macros/s/AKfycbyx4OYpiyIgKOxLqBFkJIiTaJ0wSF6Hrp12Krkd7MNL996uySBdA6o-d2F4dkT95Be1Vw/exec";
 
@@ -286,6 +300,8 @@ let pendingRecMemo = "";
 
 let lastShipmentPhotoInfo = null;
 let selectedShipmentPhotos = [];
+let lastReturnPhotoInfo = null;
+let selectedReturnPhotos = [];
 let lastSentLogIds = [];
 let lastPendingSendId = "";
   
@@ -804,6 +820,9 @@ function resetScan() {
   document.getElementById("undoBtn").style.display = "none";
   document.getElementById("returnCaseArea").style.display = "none";
   document.getElementById("recSendArea").style.display = "none";
+  document.getElementById("returnPhotoArea").style.display = "none";
+  clearReturnPhotos();
+  lastReturnPhotoInfo = null;
 
   document.getElementById("returnCaseMemo").value = "";
   document.getElementById("returnCaseMemo").style.display = "none";
@@ -1069,16 +1088,29 @@ async function sendReturnBatchAfterMemo() {
       return;
     }
 rememberSentLogIds(result);
+
+    const sentReturnPhotoInfo = {
+      mode: "返却",
+      sendId: result.sendId || lastPendingSendId || pendingReturnCaseId,
+      returnCaseId: pendingReturnCaseId,
+      ids: pendingReturnItems.map(function(record) { return record.qrText; }),
+      user: pendingReturnItems[0] ? pendingReturnItems[0].user : document.getElementById("user").value,
+      location: pendingReturnItems[0] ? pendingReturnItems[0].location : document.getElementById("location").value,
+      memo: memoForLog,
+      createdAt: new Date().toISOString()
+    };
+
     alert(
       "返却まとめて送信完了\n" +
       result.successCount + "件\n\n案件追記：" +
       (memoForLog || "追記なし") +
-      "\n\n続けて読み取る場合は『カメラ起動』を押してください"
+      "\n\n必要に応じて返却写真を保存してください"
     );
 
     stopQr();
     resetScan();
-    log("返却送信完了。続けて読み取る場合は『カメラ起動』を押してください");
+    showReturnPhotoArea(sentReturnPhotoInfo);
+    log("返却送信完了。写真保存の有無を選択してください");
 
   } catch (err) {
     handleBatchUnknownError(err, returnButton, "返却まとめて送信");
@@ -1396,6 +1428,203 @@ function drawImageCover(ctx, img, x, y, w, h) {
   ctx.clip();
   ctx.drawImage(img, nx, ny, nw, nh);
   ctx.restore();
+}
+
+
+function showReturnPhotoArea(info) {
+  lastReturnPhotoInfo = Object.assign({}, info || {}, {
+    mode: "返却",
+    createdAt: (info && info.createdAt) ? info.createdAt : new Date().toISOString()
+  });
+
+  selectedReturnPhotos = [];
+  document.getElementById("returnPhotoArea").style.display = "block";
+  document.getElementById("returnPhotoPreview").innerText =
+    "返却送信完了。\nQR未取付機・返却伝票・破損・付属品不足などがある場合は写真を保存してください。\nカメラで1枚ずつ追加、またはライブラリから最大6枚選択できます。";
+  document.getElementById("uploadReturnPhotoBtn").style.display = "none";
+  document.getElementById("uploadReturnPhotoBtn").disabled = false;
+  document.getElementById("returnCameraInput").value = "";
+  document.getElementById("returnLibraryInput").value = "";
+  scrollToElement("returnPhotoArea");
+}
+
+function chooseReturnCamera() { document.getElementById("returnCameraInput").click(); }
+function chooseReturnLibrary() { document.getElementById("returnLibraryInput").click(); }
+
+function addReturnCameraPhoto() {
+  const input = document.getElementById("returnCameraInput");
+  const files = Array.from(input.files || []);
+  if (files.length === 0) return;
+  addReturnPhotosToList(files);
+  input.value = "";
+}
+
+function addReturnLibraryPhotos() {
+  const input = document.getElementById("returnLibraryInput");
+  const files = Array.from(input.files || []);
+  if (files.length === 0) return;
+  addReturnPhotosToList(files);
+  input.value = "";
+}
+
+function addReturnPhotosToList(files) {
+  if (selectedReturnPhotos.length + files.length > 6) {
+    alert("写真は最大6枚までです。\n現在：" + selectedReturnPhotos.length + "枚");
+    return;
+  }
+  files.forEach(function(file) { selectedReturnPhotos.push(file); });
+  updateReturnPhotoPreview();
+}
+
+function updateReturnPhotoPreview() {
+  const count = selectedReturnPhotos.length;
+  if (count === 0) {
+    document.getElementById("returnPhotoPreview").innerText = "写真はまだ選択されていません。";
+    document.getElementById("uploadReturnPhotoBtn").style.display = "none";
+    return;
+  }
+  document.getElementById("returnPhotoPreview").innerText =
+    count + "枚追加済み\n最大6枚まで。1枚のA4コラージュ画像にして保存します。";
+  document.getElementById("uploadReturnPhotoBtn").style.display = "block";
+}
+
+function clearReturnPhotos() {
+  selectedReturnPhotos = [];
+  const cameraInput = document.getElementById("returnCameraInput");
+  const libraryInput = document.getElementById("returnLibraryInput");
+  if (cameraInput) cameraInput.value = "";
+  if (libraryInput) libraryInput.value = "";
+  const preview = document.getElementById("returnPhotoPreview");
+  const uploadBtn = document.getElementById("uploadReturnPhotoBtn");
+  if (preview) preview.innerText = "写真はまだ選択されていません。";
+  if (uploadBtn) uploadBtn.style.display = "none";
+}
+
+function skipReturnPhotos() {
+  document.getElementById("returnPhotoArea").style.display = "none";
+  document.getElementById("returnCameraInput").value = "";
+  document.getElementById("returnLibraryInput").value = "";
+  document.getElementById("returnPhotoPreview").innerText = "";
+  document.getElementById("uploadReturnPhotoBtn").style.display = "none";
+  document.getElementById("uploadReturnPhotoBtn").disabled = false;
+  selectedReturnPhotos = [];
+  lastReturnPhotoInfo = null;
+  log("返却写真なしで完了しました。続けて読み取る場合は「カメラ起動」を押してください");
+}
+
+async function uploadReturnPhotos() {
+  const files = selectedReturnPhotos.slice();
+
+  if (!lastReturnPhotoInfo) {
+    alert("返却送信情報がありません");
+    return;
+  }
+  if (files.length === 0) {
+    alert("写真を選択してください");
+    return;
+  }
+  if (files.length > 6) {
+    alert("写真は最大6枚までです");
+    return;
+  }
+
+  const btn = document.getElementById("uploadReturnPhotoBtn");
+  btn.disabled = true;
+  log("返却写真をA4コラージュ化しています...");
+
+  try {
+    const collageBase64 = await makeReturnCollage(files, lastReturnPhotoInfo);
+    log("返却写真を保存中...\n送信ID：" + (lastReturnPhotoInfo.sendId || ""));
+
+    const result = await fetch(GAS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({
+        action: "saveReturnPhoto",
+        photoBase64: collageBase64,
+        photoInfo: lastReturnPhotoInfo
+      })
+    }).then(function(response) { return response.json(); });
+
+    if (!result.ok) {
+      alert("返却写真保存失敗\n" + result.message);
+      log("返却写真保存失敗");
+      btn.disabled = false;
+      return;
+    }
+
+    alert("返却写真を保存しました");
+    document.getElementById("returnPhotoArea").style.display = "none";
+    document.getElementById("returnCameraInput").value = "";
+    document.getElementById("returnLibraryInput").value = "";
+    document.getElementById("returnPhotoPreview").innerText = "";
+    btn.style.display = "none";
+    btn.disabled = false;
+    selectedReturnPhotos = [];
+    lastReturnPhotoInfo = null;
+    log("返却写真保存完了。続けて読み取る場合は「カメラ起動」を押してください");
+
+  } catch (err) {
+    alert("返却写真保存エラー\n" + err);
+    log("返却写真保存エラー");
+    btn.disabled = false;
+  }
+}
+
+function makeReturnCollage(files, info) {
+  return new Promise(async function(resolve) {
+    const images = [];
+    for (const file of files) {
+      const img = await loadPhotoImage(file);
+      images.push(img);
+    }
+
+    const cols = 3;
+    const rows = 2;
+    const cellW = 1100;
+    const cellH = 825;
+    const headerH = 220;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = cols * cellW;
+    canvas.height = rows * cellH + headerH;
+    const ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#000000";
+    ctx.font = "38px sans-serif";
+    ctx.fillText("返却写真", 20, 48);
+    ctx.font = "28px sans-serif";
+    ctx.fillText("日時：" + new Date().toLocaleString("ja-JP"), 20, 88);
+    ctx.fillText("担当：" + (info.user || ""), 20, 128);
+    ctx.fillText("拠点：" + (info.location || ""), 20, 168);
+
+    ctx.fillText("送信ID：" + (info.sendId || ""), 520, 88);
+    if (info.returnCaseId) ctx.fillText("返却案件ID：" + info.returnCaseId, 520, 128);
+    if (info.memo) ctx.fillText("追記：" + String(info.memo).slice(0, 70), 520, 168);
+
+    const idText = (info.ids || []).join(" ");
+    ctx.fillText("QR：" + idText.slice(0, 78), 1420, 88);
+    if (idText.length > 78) ctx.fillText(idText.slice(78, 156), 1420, 128);
+    if (idText.length > 156) ctx.fillText(idText.slice(156, 234), 1420, 168);
+
+    for (let i = 0; i < 6; i++) {
+      const x = (i % cols) * cellW;
+      const y = Math.floor(i / cols) * cellH + headerH;
+      ctx.strokeStyle = "#cccccc";
+      ctx.strokeRect(x, y, cellW, cellH);
+      ctx.fillStyle = "#f5f5f5";
+      ctx.fillRect(x + 1, y + 1, cellW - 2, cellH - 2);
+      if (images[i]) drawImageCover(ctx, images[i], x, y, cellW, cellH);
+      ctx.fillStyle = "rgba(0,0,0,0.65)";
+      ctx.fillRect(x + 10, y + 10, 92, 44);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "30px sans-serif";
+      ctx.fillText((i + 1) + "枚目", x + 18, y + 42);
+    }
+    resolve(canvas.toDataURL("image/jpeg", 0.92));
+  });
 }
 
 function sendToSheet(qrText) {

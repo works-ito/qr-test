@@ -560,7 +560,7 @@ function saveSelections() {
 }
 
 function loadSelections() {
-  if (localStorage.getItem("mode")) document.getElementById("mode").value = localStorage.getItem("mode");
+  document.getElementById("mode").value = "出庫";
   if (localStorage.getItem("location")) document.getElementById("location").value = localStorage.getItem("location");
   if (localStorage.getItem("user")) document.getElementById("user").value = localStorage.getItem("user");
   if (localStorage.getItem("recTarget")) document.getElementById("recTarget").value = localStorage.getItem("recTarget");

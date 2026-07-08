@@ -311,7 +311,29 @@ function isRecMode() {
 function log(msg) {
   document.getElementById("status").innerText = msg;
 }
+let currentVersion = null;
+let pendingAutoReload = false;
 
+function checkAppVersion() {
+  fetch("./version.json?t=" + Date.now(), { cache: "no-store" })
+    .then(r => r.json())
+    .then(data => {
+      if (currentVersion === null) {
+        currentVersion = data.version;
+        return;
+      }
+
+      if (data.version !== currentVersion) {
+        if (scannedRecords.length > 0) {
+          pendingAutoReload = true;
+          return;
+        }
+
+        location.href = location.pathname + "?v=" + Date.now();
+      }
+    })
+    .catch(console.error);
+}
 function formatDateYYYYMMDD(date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -758,6 +780,10 @@ function resetScan() {
   document.querySelectorAll('input[name="returnMemoType"]').forEach(function(radio) { radio.checked = false; });
   document.querySelectorAll('input[name="recMemoType"]').forEach(function(radio) { radio.checked = false; });
   log("読取履歴をリセットしました");
+if (pendingAutoReload) {
+  pendingAutoReload = false;
+  location.href = location.pathname + "?v=" + Date.now();
+}
 }
 
 function undoLastScan() {
@@ -1572,7 +1598,7 @@ document.querySelectorAll('input[name="recMemoType"]').forEach(function(radio) {
 loadSelections();
 toggleRecTarget();
 checkAppVersion();
-setInterval(checkAppVersion, 60000);
+setInterval(checkAppVersion, 10000);
 </script>
 </body>
 </html>

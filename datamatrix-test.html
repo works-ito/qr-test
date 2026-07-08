@@ -1571,6 +1571,8 @@ document.querySelectorAll('input[name="recMemoType"]').forEach(function(radio) {
 
 loadSelections();
 toggleRecTarget();
+checkAppVersion();
+setInterval(checkAppVersion, 60000);
 </script>
 </body>
 </html>

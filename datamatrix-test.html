@@ -1513,27 +1513,29 @@ function restartQrCamera() {
   setTimeout(function() { startQr(); }, 300);
 }
 
-  function rememberSentLogIds(result) {
+function rememberSentLogIds(result) {
   lastSentLogIds = [];
 
-  if (result.logId) {
-    lastSentLogIds.push(result.logId);
+  let sendId = "";
+
+  if (result.sendId) {
+    sendId = result.sendId;
   }
 
-  if (Array.isArray(result.logIds)) {
-    lastSentLogIds = lastSentLogIds.concat(result.logIds);
-  }
-
-  if (Array.isArray(result.results)) {
+  if (!sendId && Array.isArray(result.results)) {
     result.results.forEach(function(item) {
-      if (item.logId) lastSentLogIds.push(item.logId);
+      if (!sendId && item.lastItem && item.lastItem.送信ID) {
+        sendId = item.lastItem.送信ID;
+      }
     });
   }
 
-  lastSentLogIds = Array.from(new Set(lastSentLogIds));
+  if (sendId) {
+    lastSentLogIds = [sendId];
+  }
 
   document.getElementById("cancelLastSendBtn").style.display =
-    lastSentLogIds.length > 0 ? "block" : "none";
+    sendId ? "block" : "none";
 }
 
 async function cancelLastSend() {
@@ -1542,33 +1544,33 @@ async function cancelLastSend() {
     return;
   }
 
-  if (!confirm("直前送信 " + lastSentLogIds.length + "件を取消します。よろしいですか？")) {
+  const sendId = lastSentLogIds[0];
+
+  if (!confirm("直前送信を取消しますか？")) {
     return;
   }
 
   const btn = document.getElementById("cancelLastSendBtn");
   btn.disabled = true;
-  log("取消送信中...");
+  log("直前送信を取消中...");
 
   try {
-    for (const logId of lastSentLogIds) {
-      const result = await fetch(GAS_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify({
-          action: "cancel",
-          targetLogId: logId
-        })
-      }).then(function(response) {
-        return response.json();
-      });
+    const result = await fetch(GAS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({
+        action: "cancelSend",
+        sendId: sendId
+      })
+    }).then(function(response) {
+      return response.json();
+    });
 
-      if (!result.ok) {
-        throw new Error(result.message || "取消失敗：" + logId);
-      }
+    if (!result.ok) {
+      throw new Error(result.message || "取消に失敗しました");
     }
 
-    alert("取消しました");
+    alert("取消しました\n" + result.cancelCount + "件");
     lastSentLogIds = [];
     btn.style.display = "none";
     btn.disabled = false;

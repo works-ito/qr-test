@@ -324,6 +324,9 @@ function checkAppVersion() {
       }
 
       if (data.version !== currentVersion) {
+        
+        currentVersion = data.version;
+        
         if (scannedRecords.length > 0) {
           pendingAutoReload = true;
           return;
@@ -333,6 +336,29 @@ function checkAppVersion() {
       }
     })
     .catch(console.error);
+}
+  async function checkAppVersionNow() {
+  try {
+    const response = await fetch("./version.json?t=" + Date.now(), { cache: "no-store" });
+    const data = await response.json();
+
+    if (currentVersion === null) {
+      currentVersion = data.version;
+      return true;
+    }
+
+    if (data.version !== currentVersion) {
+      currentVersion = data.version;
+      location.href = location.pathname + "?v=" + Date.now();
+      return false;
+    }
+
+    return true;
+
+  } catch (err) {
+    console.log("version check failed", err);
+    return true;
+  }
 }
 function formatDateYYYYMMDD(date) {
   const y = date.getFullYear();
@@ -576,6 +602,12 @@ function playBeep(type) {
 }
 
 async function startQr() {
+  const isLatest = await checkAppVersionNow();
+
+  if (!isLatest) {
+    return;
+  }
+
   log("カメラ起動中...");
 
   if (scanning) {

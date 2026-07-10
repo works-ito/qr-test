@@ -126,6 +126,30 @@ textarea {
   box-sizing:border-box;
   margin-bottom:12px;
 }
+#quantityInputArea {
+  display:none;
+  margin-top:20px;
+  padding:14px;
+  border:2px solid #333;
+  background:#eefaf0;
+}
+
+#quantityItemName {
+  font-size:28px;
+  font-weight:bold;
+  margin-bottom:6px;
+}
+
+#quantityItemInfo {
+  font-size:18px;
+  margin-bottom:14px;
+}
+
+#quantityValue {
+  font-size:30px;
+  text-align:center;
+  font-weight:bold;
+}
 </style>
 </head>
 
@@ -210,7 +234,23 @@ textarea {
 
 <div id="count">読取件数：0件</div>
 <div id="scanList"></div>
+<div id="quantityInputArea">
+  <div id="quantityItemName"></div>
+  <div id="quantityItemInfo"></div>
 
+  <input
+    type="number"
+    id="quantityValue"
+    min="1"
+    step="1"
+    inputmode="numeric"
+    placeholder="数量を入力"
+  >
+
+  <button onclick="addQuantityItem()">数量を追加</button>
+  <button onclick="cancelQuantityInput()">この読取を取消</button>
+</div>
+  
 <div id="memoArea">
   <div>追記対象：</div>
   <div id="memoTarget" style="font-weight:bold; margin-bottom:10px;"></div>
@@ -311,6 +351,7 @@ let lastReturnPhotoInfo = null;
 let selectedReturnPhotos = [];
 let lastSentLogIds = [];
 let lastPendingSendId = "";
+let pendingQuantityItem = null;
   
 const SCAN_INTERVAL = 120;
 const CROP_RATIO = 0.55;
@@ -772,21 +813,217 @@ function scanLoop() {
   // ZXing版ではdecodeFromVideoDeviceが連続読取するため、この関数は使わない
 }
 
+function isManagedId(text) {
+  text = String(text).trim();
+
+  // 個体管理・簡易個体管理：
+  // 機種コード-3桁 または 機種コード-4桁
+  return /^[A-Za-z0-9]+-\d{3,4}$/.test(text);
+}
+
+function isQuantityItemCode(text) {
+  text = String(text).trim();
+
+  // 数量管理品コード：
+  // ハイフンなしの英数字
+  return /^[A-Za-z0-9]{2,30}$/.test(text);
+}
+
 function isValidQrText(text) {
   text = String(text).trim();
+
+  // 旧Googleフォーム形式を維持
   if (text.includes("entry.") && text.includes("=")) return true;
-  if (/^[A-Z0-9]{2,10}-[A-Z0-9]{1,10}$/.test(text)) return true;
+
+  if (isManagedId(text)) return true;
+  if (isQuantityItemCode(text)) return true;
+
   return false;
 }
 
+async function startQuantityInput(itemCode) {
+  if (scanBusy) return;
+
+  scanBusy = true;
+  log("数量管理品を確認中...\n" + itemCode);
+
+  try {
+    const response = await fetch(GAS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({
+        action: "getQuantityItem",
+        itemCode: itemCode
+      })
+    });
+
+    const text = await response.text();
+
+    let result;
+    try {
+      result = JSON.parse(text);
+    } catch (e) {
+      throw new Error(
+        "数量管理品の確認結果を取得できませんでした\n" +
+        text.slice(0, 200)
+      );
+    }
+
+    if (!result.ok || !result.item) {
+      playBeep("error");
+      alert(
+        "数量管理品マスタに登録されていません\n\n" +
+        itemCode
+      );
+      log("未登録の数量管理品コード\n" + itemCode);
+      scanBusy = false;
+      return;
+    }
+
+    pendingQuantityItem = {
+      itemCode: result.item.itemCode || itemCode,
+      displayName: result.item.displayName || "",
+      category: result.item.category || "",
+      unit: result.item.unit || "",
+      mode: document.getElementById("mode").value,
+      user: document.getElementById("user").value,
+      location: document.getElementById("location").value
+    };
+
+    document.getElementById("quantityItemName").innerText =
+      pendingQuantityItem.displayName;
+
+    document.getElementById("quantityItemInfo").innerText =
+      "品目コード：" + pendingQuantityItem.itemCode +
+      "\n区分：" + pendingQuantityItem.category +
+      "　単位：" + pendingQuantityItem.unit;
+
+    document.getElementById("quantityValue").value = "";
+    document.getElementById("quantityInputArea").style.display = "block";
+
+    flashScanFrame();
+    playBeep("success");
+
+    if (navigator.vibrate) navigator.vibrate(100);
+
+    log("数量を入力してください");
+    scrollToElement("quantityInputArea");
+
+    setTimeout(function() {
+      document.getElementById("quantityValue").focus();
+    }, 400);
+
+  } catch (err) {
+    alert("数量管理品確認エラー\n" + err);
+    log("数量管理品確認エラー");
+    scanBusy = false;
+  }
+}
+
+function addQuantityItem() {
+  if (!pendingQuantityItem) {
+    alert("数量管理品の情報がありません");
+    return;
+  }
+
+  const quantity = Number(
+    document.getElementById("quantityValue").value
+  );
+
+  if (!Number.isInteger(quantity) || quantity <= 0) {
+    alert("数量を1以上の整数で入力してください");
+    return;
+  }
+
+  const item = pendingQuantityItem;
+
+  const record = {
+    key:
+      "QTY__" +
+      item.itemCode +
+      "__" +
+      item.mode +
+      "__" +
+      Date.now(),
+
+    qrText: item.itemCode,
+    mode: item.mode,
+    user: item.user,
+    location: item.location,
+
+    recordType: "quantity",
+    itemCode: item.itemCode,
+    displayName: item.displayName,
+    category: item.category,
+    unit: item.unit,
+    quantity: quantity,
+
+    recTarget: "",
+    recDate: "",
+
+    displayText:
+      item.displayName +
+      " × " +
+      quantity +
+      item.unit
+  };
+
+  scannedRecords.push(record);
+  scannedSet.add(record.key);
+
+  lastScanned = record.key;
+  lastScannedRecord = record;
+
+  pendingQuantityItem = null;
+  scanBusy = false;
+
+  document.getElementById("quantityInputArea").style.display = "none";
+  document.getElementById("quantityValue").value = "";
+
+  document.getElementById("undoBtn").style.display = "block";
+  document.getElementById("sendBatchBtn").style.display = "block";
+  document.getElementById("sendBatchBtn").disabled = false;
+  document.getElementById("sendBatchBtn").innerText =
+    "読取分をまとめて送信";
+
+  updateScanDisplay(
+    "数量追加 ✔ " +
+    record.displayText
+  );
+
+  log("数量を追加しました。次のQRを読み取ってください");
+}
+
+function cancelQuantityInput() {
+  pendingQuantityItem = null;
+  scanBusy = false;
+
+  document.getElementById("quantityInputArea").style.display = "none";
+  document.getElementById("quantityValue").value = "";
+
+  log("数量管理品の読取を取消しました");
+}
+  
 function handleDecoded(decodedText) {
   decodedText = String(decodedText).trim();
+
+  if (scanBusy) return;
 
   if (!isValidQrText(decodedText)) {
     log("対応形式ではないため無視しました\n" + decodedText);
     return;
   }
 
+  // 管理番号形式ではない英数字コードは数量管理品候補
+  if (
+    isQuantityItemCode(decodedText) &&
+    !isManagedId(decodedText)
+  ) {
+    startQuantityInput(decodedText);
+    return;
+  }
+
+  // ここから下は既存の個体管理系処理
   const record = makeScanRecord(decodedText);
 
   if (scannedSet.has(record.key)) return;
@@ -1209,14 +1446,25 @@ function createBatchId() {
 }
   
 function buildBatchRecordData(record) {
-  return {
+  const data = {
     mode: record.mode,
     qr: record.qrText,
     user: record.user,
     location: record.location,
-    recTarget: record.recTarget,
+    recTarget: record.recTarget || "",
     recDate: record.recDate || ""
   };
+
+  if (record.recordType === "quantity") {
+    data.recordType = "quantity";
+    data.itemCode = record.itemCode;
+    data.displayName = record.displayName;
+    data.quantity = record.quantity;
+    data.unit = record.unit;
+    data.category = record.category;
+  }
+
+  return data;
 }
 
 function sendBatchRecords(records, options) {

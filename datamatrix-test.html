@@ -352,6 +352,8 @@ let selectedReturnPhotos = [];
 let lastSentLogIds = [];
 let lastPendingSendId = "";
 let pendingQuantityItem = null;
+let lastQuantityCode = "";
+let lastQuantityCompletedAt = 0;
   
 const SCAN_INTERVAL = 120;
 const CROP_RATIO = 0.55;
@@ -973,7 +975,12 @@ function addQuantityItem() {
 
   lastScanned = record.key;
   lastScannedRecord = record;
+  lastQuantityCode = item.itemCode;
+  lastQuantityCompletedAt = Date.now();
 
+  pendingQuantityItem = null;
+  scanBusy = false;
+  
   pendingQuantityItem = null;
   scanBusy = false;
 
@@ -995,9 +1002,13 @@ function addQuantityItem() {
 }
 
 function cancelQuantityInput() {
+  
   pendingQuantityItem = null;
   scanBusy = false;
 
+  lastQuantityCode = "";
+  lastQuantityCompletedAt = 0;
+  
   document.getElementById("quantityInputArea").style.display = "none";
   document.getElementById("quantityValue").value = "";
 
@@ -1014,14 +1025,24 @@ function handleDecoded(decodedText) {
     return;
   }
 
-  // 管理番号形式ではない英数字コードは数量管理品候補
+ // 管理番号形式ではない英数字コードは数量管理品候補
+if (
+  isQuantityItemCode(decodedText) &&
+  !isManagedId(decodedText)
+) {
+  const now = Date.now();
+
+  // 数量追加直後に、同じQRをカメラが再読取するのを防止
   if (
-    isQuantityItemCode(decodedText) &&
-    !isManagedId(decodedText)
+    decodedText.toLowerCase() === lastQuantityCode.toLowerCase() &&
+    now - lastQuantityCompletedAt < 2000
   ) {
-    startQuantityInput(decodedText);
     return;
   }
+
+  startQuantityInput(decodedText);
+  return;
+}
 
   // ここから下は既存の個体管理系処理
   const record = makeScanRecord(decodedText);
@@ -1100,6 +1121,15 @@ function resetScan() {
   scannedRecords = [];
   lastScanned = "";
   lastScannedRecord = null;
+  pendingQuantityItem = null;
+  scanBusy = false;
+  lastQuantityCode = "";
+  lastQuantityCompletedAt = 0;
+
+  document.getElementById("quantityInputArea").style.display = "none";
+  document.getElementById("quantityValue").value = "";
+  document.getElementById("quantityItemName").innerText = "";
+  document.getElementById("quantityItemInfo").innerText = "";
   pendingReturnItems = [];
   pendingReturnCaseId = "";
   pendingReturnMemoType = "";
